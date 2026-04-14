@@ -20,7 +20,7 @@ Students also have access to a **freeform chatbot** scoped to each lab's content
 
 Labs never close. The knowledge graph evolves across the full semester as students study, restudy, and deepen their understanding over time.
 
-**Muto doesn't replace professors. It makes them more effective by showing them exactly where to focus.**
+**Muto doesn't replace professors. It makes them more effective by showing them exactly where to focus. **
 
 ## How It Works
 
@@ -118,7 +118,7 @@ This isn't about replacing the classroom. It's about making every minute in the 
 - **Frontend**: React + TypeScript
 - **Backend**: Node.js + TypeScript
 - **Database**: Supabase (PostgreSQL + Row Level Security)
-- **Generation Pipeline**: Render (structured LLM pipeline)
+- **Generation Pipeline**: Railway (structured LLM pipeline)
 - **LMS Integration**: Canvas API (Phase 2)
 - **Auth**: Supabase Auth (institution-scoped)
 
@@ -128,7 +128,7 @@ This isn't about replacing the classroom. It's about making every minute in the 
 
 ## Team
 
-- **Deano** — Co-founder, Engineering
+- **Dean DiCarlo** — Co-founder, Engineering
 - **Owen Gulka** — Co-founder
 - **Dr. Liran Ma** — Advisor, Miami University
 

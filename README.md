@@ -20,7 +20,7 @@ Students also have access to a **freeform chatbot** scoped to each lab's content
 
 Labs never close. The knowledge graph evolves across the full semester as students study, restudy, and deepen their understanding over time.
 
-**Muto doesn't replace professors. It makes them more effective by showing them exactly where to focus. **
+**Muto doesn't replace professors. It makes them more effective by showing them exactly where to focus. And it gives students the help they need, when they need it, and in the way that they learn best.**
 
 ## How It Works
 

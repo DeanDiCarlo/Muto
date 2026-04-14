@@ -1,2 +1,3 @@
-schema.md
-northstar.md
+.claude/commands/*
+.claude/settings.json
+.claude/settings.local.json

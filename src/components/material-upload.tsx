@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
@@ -29,8 +30,6 @@ function fileTypeLabel(mime: string): string {
 export function MaterialUpload({ courseId }: { courseId: string }) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateFile = useCallback((file: File): string | null => {
@@ -45,12 +44,9 @@ export function MaterialUpload({ courseId }: { courseId: string }) {
 
   const handleUpload = useCallback(
     async (file: File) => {
-      setError(null)
-      setSuccessMsg(null)
-
       const validationError = validateFile(file)
       if (validationError) {
-        setError(validationError)
+        toast.error(validationError)
         return
       }
 
@@ -84,9 +80,9 @@ export function MaterialUpload({ courseId }: { courseId: string }) {
           throw new Error(result.error)
         }
 
-        setSuccessMsg(`Uploaded ${file.name} — parsing started.`)
+        toast.success(`Uploaded ${file.name} — parsing started.`)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Upload failed')
+        toast.error(err instanceof Error ? err.message : 'Upload failed')
       } finally {
         setUploading(false)
         if (fileInputRef.current) {
@@ -167,14 +163,6 @@ export function MaterialUpload({ courseId }: { courseId: string }) {
             </div>
           )}
         </div>
-
-        {error && (
-          <p className="mt-3 text-sm text-destructive">{error}</p>
-        )}
-
-        {successMsg && (
-          <p className="mt-3 text-sm text-green-600">{successMsg}</p>
-        )}
       </CardContent>
     </Card>
   )

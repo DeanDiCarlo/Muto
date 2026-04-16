@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ConceptTag } from './concept-tag'
+import { SourcePicker } from './source-picker'
 import { cn } from '@/lib/utils'
 import type { PlanLab, BloomsLevel } from '@/types/generation'
 
@@ -37,6 +39,7 @@ export function LabCard({
   onRemove,
   disabled = false,
   jobStatus = null,
+  availableSourceMaterials = [],
 }: {
   lab: PlanLab
   labIndex: number
@@ -44,6 +47,7 @@ export function LabCard({
   onRemove: () => void
   disabled?: boolean
   jobStatus?: LabJobStatus | null
+  availableSourceMaterials?: Array<{ id: string; file_name: string; file_type: string }>
 }) {
   const [newConcept, setNewConcept] = useState('')
 
@@ -179,12 +183,48 @@ export function LabCard({
           </div>
         </div>
 
+        {/* Source materials */}
+        <div>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">
+            Sources ({lab.source_material_ids.length})
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {lab.source_material_ids.map((id) => {
+              const mat = availableSourceMaterials.find((m) => m.id === id)
+              const label = mat?.file_name ?? id.slice(0, 8) + '…'
+              return (
+                <Badge key={id} variant="secondary" className="font-normal gap-1 max-w-[240px]">
+                  <span className="truncate">{label}</span>
+                  {!disabled && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdate({ ...lab, source_material_ids: lab.source_material_ids.filter((x) => x !== id) })}
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label={`Detach ${label}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </Badge>
+              )
+            })}
+            {!disabled && (
+              <SourcePicker
+                availableMaterials={availableSourceMaterials}
+                selectedIds={lab.source_material_ids}
+                onChange={(next) => onUpdate({ ...lab, source_material_ids: next })}
+              />
+            )}
+            {lab.source_material_ids.length === 0 && disabled && (
+              <span className="text-xs text-muted-foreground italic">No sources attached</span>
+            )}
+          </div>
+        </div>
+
         {/* Footer: questions count + cost */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
           <div className="flex items-center gap-3">
             <span>{lab.estimated_questions} questions</span>
-            <span>•</span>
-            <span>{lab.source_material_ids.length} source(s)</span>
           </div>
           <Badge variant="outline" className="font-mono">
             {formatCents(lab.estimated_cost_cents)}

@@ -18,7 +18,7 @@ import {
 import { ModuleCard } from './module-card'
 import type { LabJobStatus } from './lab-card'
 import { createClient } from '@/lib/supabase/client'
-import { updatePlan, approvePlan } from '@/lib/actions/generation'
+import { updatePlan, approvePlan, getSourceMaterialsForCourse } from '@/lib/actions/generation'
 import {
   planDataSchema,
   type PlanData,
@@ -66,6 +66,7 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [labJobs, setLabJobs] = useState<Record<string, LabJobStatus>>({})
+  const [availableSourceMaterials, setAvailableSourceMaterials] = useState<Array<{ id: string; file_name: string; file_type: string }>>([])
 
   const isReadOnly = plan.status !== 'draft'
   const isGenerating = plan.status === 'generating' || plan.status === 'approved'
@@ -122,6 +123,18 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
       supabase.removeChannel(channel)
     }
   }, [isGenerating, plan.course_id])
+
+  // Fetch available source materials for the course once on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const res = await getSourceMaterialsForCourse(plan.course_id)
+      if (!cancelled && res.success) setAvailableSourceMaterials(res.materials)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [plan.course_id])
 
   function updateModule(idx: number, next: PlanModule) {
     const modules = planData.modules.map((m, i) => (i === idx ? next : m))
@@ -276,6 +289,7 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
                 onRemove={() => removeModule(idx)}
                 disabled={isReadOnly || isPending}
                 jobStatusByLabIndex={jobStatusByLabIndex}
+                availableSourceMaterials={availableSourceMaterials}
               />
             )
           })

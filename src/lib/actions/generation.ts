@@ -373,3 +373,36 @@ export async function cancelPlan(planId: string) {
     return { success: false as const, error: message }
   }
 }
+
+// ---------------------------------------------------------------------------
+// getSourceMaterialsForCourse
+// ---------------------------------------------------------------------------
+
+const getSourceMaterialsForCourseSchema = z.object({ courseId: z.string().uuid() })
+
+export async function getSourceMaterialsForCourse(courseId: string) {
+  try {
+    const parsed = getSourceMaterialsForCourseSchema.safeParse({ courseId })
+    if (!parsed.success) {
+      return { success: false as const, error: 'Invalid course ID' }
+    }
+
+    const { user, supabase } = await getAuthUser()
+    await assertCourseAccess(courseId, user.id)
+
+    const { data, error } = await supabase
+      .from('source_materials')
+      .select('id, file_name, file_type')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      return { success: false as const, error: error.message }
+    }
+
+    return { success: true as const, materials: data ?? [] }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return { success: false as const, error: message }
+  }
+}

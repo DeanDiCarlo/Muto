@@ -2,8 +2,8 @@ import 'dotenv/config'
 import { processNextJob } from './lib/job-runner.js'
 
 // Register processors here as they are implemented (T8, T9, etc.)
-// import './processors/parse-materials.js'
-// import './processors/propose-plan.js'
+import './processors/parse-materials.js'
+import './processors/propose-plan.js'
 // import './processors/generate-lab.js'
 // import './processors/generate-embeddings.js'
 

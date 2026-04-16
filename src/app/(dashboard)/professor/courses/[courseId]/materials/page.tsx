@@ -1,6 +1,9 @@
 import { getMaterials } from '@/lib/actions/materials'
+import { getCourseOverview } from '@/lib/actions/courses'
 import { MaterialUpload } from '@/components/material-upload'
 import { MaterialList } from '@/components/material-list'
+import { PageHeader } from '@/components/shell/page-header'
+import { InjectBreadcrumbLabel } from '@/lib/utils/breadcrumb-context'
 
 export default async function MaterialsPage({
   params,
@@ -9,21 +12,33 @@ export default async function MaterialsPage({
 }) {
   const { courseId } = await params
 
-  const result = await getMaterials(courseId)
+  const [result, overview] = await Promise.all([
+    getMaterials(courseId),
+    getCourseOverview(courseId),
+  ])
+
+  const allParsed =
+    result.success &&
+    result.materials.length > 0 &&
+    result.materials.every((m) => m.parseJob?.status === 'completed')
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Course Materials</h1>
-        <p className="text-muted-foreground mt-1">
-          Upload PDFs, documents, or images to generate interactive labs.
-        </p>
-      </div>
+      <InjectBreadcrumbLabel segmentKey={courseId} value={overview?.course.title} />
+      <PageHeader
+        title="Course Materials"
+        description="Uploads used by the generation pipeline."
+      />
 
       <MaterialUpload courseId={courseId} />
 
       {result.success ? (
-        <MaterialList courseId={courseId} initialMaterials={result.materials} />
+        <MaterialList
+          courseId={courseId}
+          initialMaterials={result.materials}
+          planStatus={overview?.planStatus ?? null}
+          allParsed={allParsed}
+        />
       ) : (
         <p className="text-destructive">Error loading materials: {result.error}</p>
       )}

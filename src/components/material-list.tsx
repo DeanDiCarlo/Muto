@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { toast } from 'sonner'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -59,9 +61,13 @@ function StatusBadge({ status }: { status: string }) {
 export function MaterialList({
   courseId,
   initialMaterials,
+  planStatus,
+  allParsed,
 }: {
   courseId: string
   initialMaterials: MaterialWithStatus[]
+  planStatus: 'draft' | 'approved' | 'generating' | 'completed' | null
+  allParsed: boolean
 }) {
   const [materials, setMaterials] = useState<MaterialWithStatus[]>(initialMaterials)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -128,8 +134,9 @@ export function MaterialList({
 
     if (result.success) {
       setMaterials((prev) => prev.filter((m) => m.id !== materialId))
+      toast.success(`Deleted "${fileName}".`)
     } else {
-      alert(`Failed to delete: ${result.error}`)
+      toast.error(`Failed to delete: ${result.error}`)
     }
   }, [])
 
@@ -193,6 +200,43 @@ export function MaterialList({
           </CardContent>
         </Card>
       ))}
+
+      {allParsed && planStatus === null && (
+        <Card>
+          <CardContent className="py-4 text-center text-sm text-muted-foreground">
+            Materials parsed. Plan being proposed...
+          </CardContent>
+        </Card>
+      )}
+
+      {allParsed && planStatus === 'draft' && (
+        <Card>
+          <CardContent className="py-4 text-center text-sm">
+            <Link
+              href={`/professor/courses/${courseId}/plan`}
+              className="font-medium text-primary hover:underline"
+            >
+              Plan ready for review →
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {allParsed &&
+        (planStatus === 'generating' ||
+          planStatus === 'completed' ||
+          planStatus === 'approved') && (
+          <Card>
+            <CardContent className="py-4 text-center text-sm">
+              <Link
+                href={`/professor/courses/${courseId}/plan`}
+                className="font-medium text-primary hover:underline"
+              >
+                Generation in progress →
+              </Link>
+            </CardContent>
+          </Card>
+        )}
     </div>
   )
 }

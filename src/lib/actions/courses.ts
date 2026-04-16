@@ -25,6 +25,11 @@ const createCourseSchema = z.object({
   description: z.string().trim().max(1000).optional().or(z.literal('')),
 })
 
+const updateCourseSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(3, 'Title must be at least 3 characters').max(200),
+})
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -38,6 +43,31 @@ export type CourseCardData = {
   moduleCount: number
   labCount: number
   activeInstanceCount: number
+  enrolledStudentCount: number
+}
+
+export type PlanStatus = 'draft' | 'approved' | 'generating' | 'completed'
+
+export type CourseOverview = {
+  course: {
+    id: string
+    title: string
+    description: string | null
+    subjectArea: string | null
+    createdAt: string
+  }
+  materialsCount: number
+  parsingJobsInFlight: number
+  planStatus: PlanStatus | null
+  planId: string | null
+  labsCount: number
+  generatingLabsCount: number
+  completedLabsCount: number
+  failedLabsCount: number
+  instancesCount: number
+  activeInstancesCount: number
+  /** Top-most active instance; populated when there's at least one active instance. */
+  topActiveInstance: { id: string; semester: string; joinCode: string } | null
   enrolledStudentCount: number
 }
 
@@ -144,6 +174,140 @@ export async function listCoursesForProfessor(): Promise<CourseCardData[]> {
       enrolledStudentCount,
     }
   })
+}
+
+/**
+ * Returns a course + aggregate state needed by the Course Home / Next Step card.
+ * Two parallel queries: the course (+ embedded materials/plans/modules/labs/instances)
+ * and an in-flight parse-job count. All derivations happen in JS.
+ */
+export async function getCourseOverview(courseId: string): Promise<CourseOverview | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+
+  const parsedId = z.string().uuid().safeParse(courseId)
+  if (!parsedId.success) return null
+
+  const admin = createAdminClient()
+
+  const [courseRes, parseJobsRes] = await Promise.all([
+    admin
+      .from('courses')
+      .select(
+        `
+        id, title, description, subject_area, created_at,
+        source_materials ( id ),
+        generation_plans ( id, status, created_at ),
+        modules ( id, labs ( id, generation_status ) ),
+        course_instances ( id, is_active, join_code, semester, created_at, enrollments ( id ) )
+        `
+      )
+      .eq('id', parsedId.data)
+      .eq('created_by', user.id)
+      .single(),
+    admin
+      .from('generation_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('course_id', parsedId.data)
+      .eq('job_type', 'parse_materials')
+      .in('status', ['pending', 'running']),
+  ])
+
+  if (courseRes.error || !courseRes.data) return null
+  const c = courseRes.data
+
+  const materials = (c.source_materials ?? []) as Array<{ id: string }>
+  const plans = (c.generation_plans ?? []) as Array<{
+    id: string
+    status: PlanStatus
+    created_at: string
+  }>
+  const modules = (c.modules ?? []) as Array<{
+    id: string
+    labs: Array<{ id: string; generation_status: 'pending' | 'generating' | 'complete' | 'failed' }> | null
+  }>
+  const instances = (c.course_instances ?? []) as Array<{
+    id: string
+    is_active: boolean
+    join_code: string
+    semester: string
+    created_at: string
+    enrollments: Array<{ id: string }> | null
+  }>
+
+  const labs = modules.flatMap((m) => m.labs ?? [])
+  const latestPlan =
+    plans.length === 0
+      ? null
+      : [...plans].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+
+  const activeInstances = instances
+    .filter((i) => i.is_active)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+
+  return {
+    course: {
+      id: c.id,
+      title: c.title,
+      description: c.description,
+      subjectArea: c.subject_area,
+      createdAt: c.created_at,
+    },
+    materialsCount: materials.length,
+    parsingJobsInFlight: parseJobsRes.count ?? 0,
+    planStatus: latestPlan?.status ?? null,
+    planId: latestPlan?.id ?? null,
+    labsCount: labs.length,
+    generatingLabsCount: labs.filter((l) => l.generation_status === 'generating').length,
+    completedLabsCount: labs.filter((l) => l.generation_status === 'complete').length,
+    failedLabsCount: labs.filter((l) => l.generation_status === 'failed').length,
+    instancesCount: instances.length,
+    activeInstancesCount: activeInstances.length,
+    topActiveInstance:
+      activeInstances[0]
+        ? {
+            id: activeInstances[0].id,
+            semester: activeInstances[0].semester,
+            joinCode: activeInstances[0].join_code,
+          }
+        : null,
+    enrolledStudentCount: instances.reduce(
+      (sum, i) => sum + (i.enrollments?.length ?? 0),
+      0
+    ),
+  }
+}
+
+/**
+ * Rename a course. Called from the course home's inline title editor.
+ * Returns shape-compatible with `useActionState` + sonner toasts.
+ */
+export async function updateCourse(input: {
+  id: string
+  title: string
+}): Promise<{ success: true } | { success: false; error: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const parsed = updateCourseSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('courses')
+    .update({ title: parsed.data.title })
+    .eq('id', parsed.data.id)
+    .eq('created_by', user.id)
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    return { success: false, error: error?.message ?? 'Course not found' }
+  }
+
+  return { success: true }
 }
 
 /**

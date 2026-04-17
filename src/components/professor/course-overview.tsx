@@ -98,9 +98,9 @@ function CourseHeader({ overview }: { overview: CourseOverview }) {
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    setTitle(course.title)
-  }, [course.title])
+  // Sync local input when server revalidation delivers a new course.title
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setTitle(course.title) }, [course.title])
 
   useEffect(() => {
     if (editing) {

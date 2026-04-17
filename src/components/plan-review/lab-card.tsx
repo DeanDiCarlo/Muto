@@ -157,7 +157,7 @@ export function LabCard({
         {/* Bloom's levels */}
         <div>
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">
-            Bloom's Levels
+            Bloom&apos;s Levels
           </span>
           <div className="flex flex-wrap gap-1">
             {ALL_BLOOMS.map((level) => {

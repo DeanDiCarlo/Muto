@@ -23,6 +23,7 @@ const sendChatMessageSchema = z.object({
 // TODO: wire real rate limit (50/hour, 300/day per user)
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function checkChatRateLimit(_userId: string): Promise<{ allowed: boolean; resetsAt?: Date }> {
   return { allowed: true }
 }

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Exclude git worktrees (used by Claude Code) from linting
+    ".claude/worktrees/**",
   ]),
 ]);
 

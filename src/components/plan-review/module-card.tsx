@@ -27,6 +27,7 @@ export function ModuleCard({
   onRemove,
   disabled = false,
   jobStatusByLabIndex = {},
+  availableSourceMaterials = [],
 }: {
   module: PlanModule
   moduleIndex: number
@@ -34,6 +35,7 @@ export function ModuleCard({
   onRemove: () => void
   disabled?: boolean
   jobStatusByLabIndex?: Record<number, LabJobStatus | undefined>
+  availableSourceMaterials?: Array<{ id: string; file_name: string; file_type: string }>
 }) {
   function updateLab(labIdx: number, next: PlanLab) {
     const labs = module.labs.map((l, i) => (i === labIdx ? next : l))
@@ -102,6 +104,7 @@ export function ModuleCard({
                   onRemove={() => removeLab(labIdx)}
                   disabled={disabled}
                   jobStatus={jobStatusByLabIndex[labIdx] ?? null}
+                  availableSourceMaterials={availableSourceMaterials}
                 />
               ))}
               {module.labs.length === 0 && (

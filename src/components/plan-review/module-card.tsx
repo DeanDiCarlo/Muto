@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion'
 import { LabCard, type LabJobStatus } from './lab-card'
+import { SortableList } from './sortable-list'
 import type { PlanModule, PlanLab } from '@/types/generation'
 
 const DEFAULT_NEW_LAB: Omit<PlanLab, 'title'> = {
@@ -27,6 +29,9 @@ export function ModuleCard({
   onRemove,
   disabled = false,
   jobStatusByLabIndex = {},
+  dragHandle = null,
+  labIds = [],
+  onLabReorder,
 }: {
   module: PlanModule
   moduleIndex: number
@@ -34,6 +39,9 @@ export function ModuleCard({
   onRemove: () => void
   disabled?: boolean
   jobStatusByLabIndex?: Record<number, LabJobStatus | undefined>
+  dragHandle?: ReactNode
+  labIds?: string[]
+  onLabReorder?: (reorderedLabs: PlanLab[], reorderedLabIds: string[]) => void
 }) {
   function updateLab(labIdx: number, next: PlanLab) {
     const labs = module.labs.map((l, i) => (i === labIdx ? next : l))
@@ -57,10 +65,18 @@ export function ModuleCard({
     0
   )
 
+  // Build sortable items with stable IDs
+  const labsWithIds = module.labs.map((lab, idx) => ({
+    ...lab,
+    id: labIds[idx] ?? `lab-${idx}`,
+    _originalIndex: idx,
+  }))
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
+          {dragHandle}
           <span className="text-xs font-mono text-muted-foreground shrink-0">
             Module {moduleIndex + 1}
           </span>
@@ -93,18 +109,37 @@ export function ModuleCard({
               {module.labs.length} {module.labs.length === 1 ? 'lab' : 'labs'}
             </AccordionTrigger>
             <AccordionContent className="space-y-3 pt-2">
-              {module.labs.map((lab, labIdx) => (
-                <LabCard
-                  key={labIdx}
-                  lab={lab}
-                  labIndex={labIdx}
-                  onUpdate={(next) => updateLab(labIdx, next)}
-                  onRemove={() => removeLab(labIdx)}
-                  disabled={disabled}
-                  jobStatus={jobStatusByLabIndex[labIdx] ?? null}
+              {module.labs.length > 0 ? (
+                <SortableList
+                  items={labsWithIds}
+                  disabled={disabled || !onLabReorder}
+                  onReorder={(next) => {
+                    const reorderedLabs = next.map(({ id, _originalIndex, ...lab }) => lab as PlanLab)
+                    const reorderedLabIds = next.map((item) => String(item.id))
+                    if (onLabReorder) {
+                      onLabReorder(reorderedLabs, reorderedLabIds)
+                    }
+                  }}
+                  renderItem={(item, labDragHandle) => {
+                    const labIdx = labsWithIds.indexOf(item)
+                    return (
+                      <div className="flex items-start gap-1">
+                        {labDragHandle}
+                        <div className="flex-1">
+                          <LabCard
+                            lab={item}
+                            labIndex={labIdx}
+                            onUpdate={(next) => updateLab(item._originalIndex, next)}
+                            onRemove={() => removeLab(item._originalIndex)}
+                            disabled={disabled}
+                            jobStatus={jobStatusByLabIndex[item._originalIndex] ?? null}
+                          />
+                        </div>
+                      </div>
+                    )
+                  }}
                 />
-              ))}
-              {module.labs.length === 0 && (
+              ) : (
                 <p className="text-sm text-muted-foreground italic text-center py-4">
                   No labs in this module yet.
                 </p>

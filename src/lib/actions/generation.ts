@@ -373,3 +373,57 @@ export async function cancelPlan(planId: string) {
     return { success: false as const, error: message }
   }
 }
+
+// ---------------------------------------------------------------------------
+// getLabsForCourse — for post-approval per-lab job mapping
+// ---------------------------------------------------------------------------
+
+const getLabsForCourseSchema = z.object({ courseId: z.string().uuid() })
+
+export async function getLabsForCourse(courseId: string) {
+  try {
+    const parsed = getLabsForCourseSchema.safeParse({ courseId })
+    if (!parsed.success) {
+      return { success: false as const, error: 'Invalid course ID' }
+    }
+
+    const { user, supabase } = await getAuthUser()
+    await assertCourseAccess(courseId, user.id)
+
+    const { data, error } = await supabase
+      .from('labs')
+      .select('id, module_id, position, generation_status, modules!inner(course_id, position)')
+      .eq('modules.course_id', courseId)
+
+    if (error) {
+      return { success: false as const, error: error.message }
+    }
+
+    type LabRow = {
+      id: string
+      module_id: string
+      position: number
+      generation_status: string
+      modules: { course_id: string; position: number } | { course_id: string; position: number }[]
+    }
+    const rows = (data ?? []) as unknown as LabRow[]
+
+    const flat = rows.map((r) => {
+      const mod = Array.isArray(r.modules) ? r.modules[0] : r.modules
+      return {
+        id: r.id,
+        module_id: r.module_id,
+        module_position: mod?.position ?? 0,
+        position: r.position,
+        generation_status: r.generation_status,
+      }
+    })
+
+    flat.sort((a, b) => (a.module_position - b.module_position) || (a.position - b.position))
+
+    return { success: true as const, labs: flat }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return { success: false as const, error: message }
+  }
+}

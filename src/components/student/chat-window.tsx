@@ -74,15 +74,14 @@ export function ChatWindow({ sessionId, initialMessages }: ChatWindowProps) {
       throw new Error(result.error)
     }
 
-    // Replace optimistic with real message (Realtime may also deliver it — dedup handles it)
-    setMessages((prev) =>
-      prev
-        .filter((m) => m.id !== optimisticId)
-        .concat([
-          { ...result.userMessage, role: result.userMessage.role as 'student' },
-          { ...result.assistantMessage, role: result.assistantMessage.role as 'assistant' },
-        ])
-    )
+    // Replace optimistic with real messages — dedup by id in case Realtime delivered them first
+    setMessages((prev) => {
+      const byId = new Map(prev.map((m) => [m.id, m]))
+      byId.delete(optimisticId)
+      byId.set(result.userMessage.id, { ...result.userMessage, role: result.userMessage.role as 'student' })
+      byId.set(result.assistantMessage.id, { ...result.assistantMessage, role: result.assistantMessage.role as 'assistant' })
+      return Array.from(byId.values())
+    })
     setIsAssistantThinking(false)
   }
 

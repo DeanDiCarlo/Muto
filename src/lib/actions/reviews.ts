@@ -52,6 +52,34 @@ export async function startOrResumeReview(input: { instanceId: string; labId: st
       return { success: false as const, error: 'Not enrolled in this course' }
     }
 
+    // Verify labId belongs to this course instance (prevents IDOR across courses)
+    const { data: instance, error: instanceErr } = await admin
+      .from('course_instances')
+      .select('course_id')
+      .eq('id', instanceId)
+      .single()
+
+    if (instanceErr || !instance) {
+      return { success: false as const, error: 'Course instance not found' }
+    }
+
+    const { data: labRow, error: labErr } = await admin
+      .from('labs')
+      .select('id, modules!inner(course_id)')
+      .eq('id', labId)
+      .single()
+
+    if (labErr || !labRow) {
+      return { success: false as const, error: 'Lab not found' }
+    }
+
+    type LabWithModule = typeof labRow & { modules: { course_id: string } }
+    const lab = labRow as unknown as LabWithModule
+
+    if (lab.modules.course_id !== instance.course_id) {
+      return { success: false as const, error: 'Lab does not belong to this course' }
+    }
+
     // Find or create session
     const { data: existing } = await admin
       .from('review_sessions')
@@ -160,21 +188,29 @@ export async function submitReviewResponse(input: {
       return { success: false as const, error: 'Unauthorized' }
     }
 
-    // Upsert response (delete + insert since no unique constraint guaranteed)
-    await admin
+    // Verify question belongs to this session's lab and is active
+    const { data: q, error: qCheckErr } = await admin
+      .from('review_questions')
+      .select('id')
+      .eq('id', questionId)
+      .eq('lab_id', sess.lab_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (qCheckErr || !q) {
+      return { success: false as const, error: 'Question not found' }
+    }
+
+    // Atomic upsert — requires UNIQUE(review_session_id, review_question_id) from migration 004
+    const { error: upsertErr } = await admin
       .from('review_responses')
-      .delete()
-      .eq('review_session_id', sessionId)
-      .eq('review_question_id', questionId)
+      .upsert(
+        { review_session_id: sessionId, review_question_id: questionId, answer_text: answerText },
+        { onConflict: 'review_session_id,review_question_id' }
+      )
 
-    const { error: insertErr } = await admin.from('review_responses').insert({
-      review_session_id: sessionId,
-      review_question_id: questionId,
-      answer_text: answerText,
-    })
-
-    if (insertErr) {
-      return { success: false as const, error: insertErr.message }
+    if (upsertErr) {
+      return { success: false as const, error: upsertErr.message }
     }
 
     // Determine next question id
@@ -239,25 +275,41 @@ export async function completeReview(input: { sessionId: string }) {
       return { success: false as const, error: 'Unauthorized' }
     }
 
-    // Mark session complete
-    const { error: updateErr } = await admin
+    // Mark session complete — only if not already completed (idempotency guard)
+    const { data: updated, error: updateErr } = await admin
       .from('review_sessions')
       .update({ completed_at: new Date().toISOString() })
       .eq('id', sessionId)
+      .is('completed_at', null)
+      .select('id')
+      .maybeSingle()
 
     if (updateErr) {
       return { success: false as const, error: updateErr.message }
     }
+    if (!updated) {
+      // Already completed — no-op, avoid duplicate job
+      return { success: true as const }
+    }
 
     // Enqueue evaluate_review job
     // NOTE: requires `evaluate_review` in the job_type enum (migration 003)
-    await admin.from('generation_jobs').insert({
+    const { error: enqueueErr } = await admin.from('generation_jobs').insert({
       course_id: sess.labs.modules.course_id,
       created_by: user.id,
       job_type: 'evaluate_review',
       status: 'pending',
       input_payload: { session_id: sessionId },
     })
+
+    if (enqueueErr) {
+      // Roll back so the student can retry
+      await admin
+        .from('review_sessions')
+        .update({ completed_at: null })
+        .eq('id', sessionId)
+      return { success: false as const, error: 'Failed to queue evaluation. Please try again.' }
+    }
 
     return { success: true as const }
   } catch (err) {
@@ -317,6 +369,7 @@ export async function getReviewResults(input: { sessionId: string }) {
       `
       )
       .eq('enrollment_id', sess.enrollment_id)
+      .eq('review_responses.review_session_id', sessionId)
 
     if (evalErr) {
       return { success: false as const, error: evalErr.message }

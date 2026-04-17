@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -52,6 +52,19 @@ export function ReviewRunner({
   const [submitting, setSubmitting] = useState(false)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [evalLoading, setEvalLoading] = useState(false)
+  const completeOnResumeRef = useRef(false)
+
+  // On mount: if all questions were already answered (resumed session), enqueue evaluation
+  useEffect(() => {
+    if (!allAnswered || completeOnResumeRef.current) return
+    completeOnResumeRef.current = true
+    completeReview({ sessionId }).then((result) => {
+      if (!result.success) {
+        toast.error('Failed to queue evaluation. Please try again.')
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally mount-only — props don't change
 
   // Fetch results and update state
   const fetchResults = useCallback(async () => {
@@ -67,7 +80,7 @@ export function ReviewRunner({
 
   // After completing, subscribe to concept_evaluations via Realtime + poll fallback
   useEffect(() => {
-    if (phase !== 'completing' && phase !== 'results') return
+    if (phase !== 'completing') return
 
     setEvalLoading(true)
 

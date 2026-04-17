@@ -57,6 +57,34 @@ export async function getOrCreateChatSession(input: { instanceId: string; labId:
       return { success: false as const, error: 'Not enrolled in this course' }
     }
 
+    // Verify labId belongs to this course instance (prevents IDOR across courses)
+    const { data: instance, error: instanceErr } = await admin
+      .from('course_instances')
+      .select('course_id')
+      .eq('id', instanceId)
+      .single()
+
+    if (instanceErr || !instance) {
+      return { success: false as const, error: 'Course instance not found' }
+    }
+
+    const { data: labRow, error: labErr } = await admin
+      .from('labs')
+      .select('id, modules!inner(course_id)')
+      .eq('id', labId)
+      .single()
+
+    if (labErr || !labRow) {
+      return { success: false as const, error: 'Lab not found' }
+    }
+
+    type LabWithModule = typeof labRow & { modules: { course_id: string } }
+    const lab = labRow as unknown as LabWithModule
+
+    if (lab.modules.course_id !== instance.course_id) {
+      return { success: false as const, error: 'Lab does not belong to this course' }
+    }
+
     // Find or create chat session
     const { data: existing } = await admin
       .from('chat_sessions')

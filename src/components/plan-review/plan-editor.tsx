@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,9 +17,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ModuleCard } from './module-card'
+import { SortableList } from './sortable-list'
 import type { LabJobStatus } from './lab-card'
 import { createClient } from '@/lib/supabase/client'
-import { updatePlan, approvePlan, getSourceMaterialsForCourse } from '@/lib/actions/generation'
+import { updatePlan, approvePlan, getSourceMaterialsForCourse, getLabsForCourse } from '@/lib/actions/generation'
 import {
   planDataSchema,
   type PlanData,
@@ -67,6 +69,17 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [labJobs, setLabJobs] = useState<Record<string, LabJobStatus>>({})
   const [availableSourceMaterials, setAvailableSourceMaterials] = useState<Array<{ id: string; file_name: string; file_type: string }>>([])
+  const [labIdByPosition, setLabIdByPosition] = useState<Record<string, string>>({})
+
+  // Stable IDs for drag-and-drop (modules + labs)
+  const [stableIds, setStableIds] = useState(() => {
+    const mIds = initialPlanData.modules.map(() => crypto.randomUUID())
+    const lIds: Record<string, string[]> = {}
+    initialPlanData.modules.forEach((m, i) => {
+      lIds[mIds[i]] = m.labs.map(() => crypto.randomUUID())
+    })
+    return { moduleIds: mIds, labIds: lIds }
+  })
 
   const isReadOnly = plan.status !== 'draft'
   const isGenerating = plan.status === 'generating' || plan.status === 'approved'
@@ -136,8 +149,47 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
     }
   }, [plan.course_id])
 
+  // Fetch lab IDs for position mapping (post-approval)
+  useEffect(() => {
+    if (!isGenerating) return
+    ;(async () => {
+      const res = await getLabsForCourse(plan.course_id)
+      if (!res.success) return
+      const byMod: Record<number, typeof res.labs> = {}
+      for (const l of res.labs) {
+        if (!byMod[l.module_position]) byMod[l.module_position] = []
+        byMod[l.module_position].push(l)
+      }
+      const map: Record<string, string> = {}
+      for (const [modPosStr, labs] of Object.entries(byMod)) {
+        labs.forEach((l, labIdx) => {
+          map[`${modPosStr}-${labIdx}`] = l.id
+        })
+      }
+      setLabIdByPosition(map)
+    })()
+  }, [isGenerating, plan.course_id])
+
   function updateModule(idx: number, next: PlanModule) {
     const modules = planData.modules.map((m, i) => (i === idx ? next : m))
+
+    // Sync lab IDs if labs count changed
+    const moduleId = stableIds.moduleIds[idx]
+    const currentLabIds = stableIds.labIds[moduleId] ?? []
+    if (next.labs.length !== currentLabIds.length) {
+      const newLabIds = [...currentLabIds]
+      while (newLabIds.length < next.labs.length) {
+        newLabIds.push(crypto.randomUUID())
+      }
+      if (newLabIds.length > next.labs.length) {
+        newLabIds.length = next.labs.length
+      }
+      setStableIds((prev) => ({
+        ...prev,
+        labIds: { ...prev.labIds, [moduleId]: newLabIds },
+      }))
+    }
+
     setPlanData({
       modules,
       total_estimated_cost_cents: recomputeTotal(modules),
@@ -145,9 +197,16 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
   }
 
   function removeModule(idx: number) {
+    const removedModuleId = stableIds.moduleIds[idx]
     const modules = planData.modules
       .filter((_, i) => i !== idx)
       .map((m, i) => ({ ...m, position: i }))
+
+    const newModuleIds = stableIds.moduleIds.filter((_, i) => i !== idx)
+    const newLabIds = { ...stableIds.labIds }
+    delete newLabIds[removedModuleId]
+    setStableIds({ moduleIds: newModuleIds, labIds: newLabIds })
+
     setPlanData({
       modules,
       total_estimated_cost_cents: recomputeTotal(modules),
@@ -155,16 +214,37 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
   }
 
   function addModule() {
+    const newModuleId = crypto.randomUUID()
     const newModule: PlanModule = {
       title: `New Module ${planData.modules.length + 1}`,
       position: planData.modules.length,
       labs: [],
     }
     const modules = [...planData.modules, newModule]
+
+    setStableIds((prev) => ({
+      moduleIds: [...prev.moduleIds, newModuleId],
+      labIds: { ...prev.labIds, [newModuleId]: [] },
+    }))
+
     setPlanData({
       modules,
       total_estimated_cost_cents: recomputeTotal(modules),
     })
+  }
+
+  function autosaveReorder(nextPlanData: PlanData) {
+    toast.promise(
+      updatePlan(plan.id, nextPlanData, professorNotes).then((r) => {
+        if (!r.success) throw new Error(r.error)
+        return r
+      }),
+      {
+        loading: 'Saving order\u2026',
+        success: 'Order saved',
+        error: (e: Error) => `Save failed: ${e.message}`,
+      }
+    )
   }
 
   function handleSave() {
@@ -209,6 +289,17 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
       }
     })
   }
+
+  // Build sortable module items with stable IDs
+  const modulesWithIds = planData.modules.map((m, i) => ({
+    ...m,
+    id: stableIds.moduleIds[i] ?? `mod-${i}`,
+  }))
+
+  // Compute labs missing source materials for approval warning
+  const emptySourceLabs = planData.modules.flatMap((m) =>
+    m.labs.filter((l) => l.source_material_ids.length === 0)
+  )
 
   return (
     <div className="space-y-6">
@@ -269,30 +360,65 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
             </CardContent>
           </Card>
         ) : (
-          planData.modules.map((module, idx) => {
-            // Build a map of lab index → job status by matching on lab_id
-            // Note: in draft mode, labs don't have IDs yet; in generating mode,
-            // jobs reference labs by ID which we don't have here. We pass the
-            // empty record so LabCard renders without job badges in draft mode.
-            const jobStatusByLabIndex: Record<number, LabJobStatus | undefined> =
-              {}
-            // labJobs is keyed by lab_id which is created at approval time and
-            // not stored in plan_data. After T11, the lab_id↔plan-position
-            // mapping requires fetching labs from DB. For now, we just expose
-            // any matching jobs by displaying them at the bottom of the page.
-            return (
-              <ModuleCard
-                key={idx}
-                module={module}
-                moduleIndex={idx}
-                onUpdate={(next) => updateModule(idx, next)}
-                onRemove={() => removeModule(idx)}
-                disabled={isReadOnly || isPending}
-                jobStatusByLabIndex={jobStatusByLabIndex}
-                availableSourceMaterials={availableSourceMaterials}
-              />
-            )
-          })
+          <SortableList
+            items={modulesWithIds}
+            disabled={isReadOnly || isPending}
+            onReorder={(next) => {
+              const reorderedModules = next.map((item, i) => {
+                const { id, ...mod } = item
+                return { ...mod, position: i }
+              })
+              const reorderedModuleIds = next.map((item) => String(item.id))
+              const newPlanData: PlanData = {
+                modules: reorderedModules,
+                total_estimated_cost_cents: recomputeTotal(reorderedModules),
+              }
+              setPlanData(newPlanData)
+              setStableIds((prev) => ({ ...prev, moduleIds: reorderedModuleIds }))
+              autosaveReorder(newPlanData)
+            }}
+            renderItem={(item, dragHandle) => {
+              const moduleId = String(item.id)
+              const moduleIdx = stableIds.moduleIds.indexOf(moduleId)
+
+              const jobStatusByLabIndex: Record<number, LabJobStatus | undefined> = {}
+              for (let labIdx = 0; labIdx < item.labs.length; labIdx++) {
+                const labId = labIdByPosition[`${moduleIdx}-${labIdx}`]
+                if (labId && labJobs[labId]) {
+                  jobStatusByLabIndex[labIdx] = labJobs[labId]
+                }
+              }
+
+              return (
+                <ModuleCard
+                  module={item}
+                  moduleIndex={moduleIdx}
+                  onUpdate={(next) => updateModule(moduleIdx, next)}
+                  onRemove={() => removeModule(moduleIdx)}
+                  disabled={isReadOnly || isPending}
+                  jobStatusByLabIndex={jobStatusByLabIndex}
+                  availableSourceMaterials={availableSourceMaterials}
+                  dragHandle={dragHandle}
+                  labIds={stableIds.labIds[moduleId] ?? []}
+                  onLabReorder={(reorderedLabs, reorderedLabIds) => {
+                    const newModules = planData.modules.map((m, i) =>
+                      i === moduleIdx ? { ...m, labs: reorderedLabs } : m
+                    )
+                    const newPlanData: PlanData = {
+                      modules: newModules,
+                      total_estimated_cost_cents: recomputeTotal(newModules),
+                    }
+                    setPlanData(newPlanData)
+                    setStableIds((prev) => ({
+                      ...prev,
+                      labIds: { ...prev.labIds, [moduleId]: reorderedLabIds },
+                    }))
+                    autosaveReorder(newPlanData)
+                  }}
+                />
+              )
+            }}
+          />
         )}
 
         {!isReadOnly && (
@@ -382,9 +508,17 @@ export function PlanEditor({ plan }: { plan: GenerationPlanRow }) {
               .
               <br />
               <br />
-              You won't be able to edit the plan after approval.
+              You won&apos;t be able to edit the plan after approval.
             </DialogDescription>
           </DialogHeader>
+          {emptySourceLabs.length > 0 && (
+            <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <strong className="font-semibold">Warning:</strong>{' '}
+              {emptySourceLabs.length} lab{emptySourceLabs.length === 1 ? '' : 's'}{' '}
+              {emptySourceLabs.length === 1 ? 'has' : 'have'} no source materials
+              attached. Generation quality may suffer.
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"

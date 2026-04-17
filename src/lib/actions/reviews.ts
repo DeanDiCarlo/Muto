@@ -105,6 +105,7 @@ export async function startOrResumeReview(input: { instanceId: string; labId: st
     return {
       success: true as const,
       sessionId,
+      enrollmentId: enrollment.id,
       questions: (questions ?? []).map((q) => ({
         id: q.id,
         question_text: q.question_text,

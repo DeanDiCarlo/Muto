@@ -160,7 +160,7 @@ async function generateLab(job: GenerationJob): Promise<Record<string, unknown> 
     await updateProgress(job.id, 55, 'Generating review questions')
 
     // --- Claude call #2: review questions (skip if no concepts) ---
-    let questionRows: Array<{
+    const questionRows: Array<{
       lab_id: string
       concept_id: string
       question_text: string
@@ -170,7 +170,7 @@ async function generateLab(job: GenerationJob): Promise<Record<string, unknown> 
       is_active: boolean
       position: number
     }> = []
-    let approvedConceptIds = new Set<string>()
+    const approvedConceptIds = new Set<string>()
     let questionsInputTokens = 0
     let questionsOutputTokens = 0
 

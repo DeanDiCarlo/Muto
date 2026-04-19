@@ -8,6 +8,7 @@ export type JobType =
   | 'generate_batch'
   | 'generate_embeddings'
   | 'generate_review_questions'
+  | 'evaluate_review'
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 

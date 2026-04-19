@@ -4,7 +4,8 @@ import { processNextJob } from './lib/job-runner.js'
 // Register processors here as they are implemented (T8, T9, etc.)
 import './processors/parse-materials.js'
 import './processors/propose-plan.js'
-// import './processors/generate-lab.js'
+import './processors/generate-lab.js'
+import './processors/evaluate-review.js'
 // import './processors/generate-embeddings.js'
 
 const POLL_INTERVAL_MS = 5000

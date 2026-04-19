@@ -83,6 +83,47 @@ export const generateLabPayloadSchema = z.object({
 })
 export type GenerateLabPayload = z.infer<typeof generateLabPayloadSchema>
 
+export const evaluateReviewPayloadSchema = z.object({
+  session_id: z.string().uuid(),
+})
+export type EvaluateReviewPayload = z.infer<typeof evaluateReviewPayloadSchema>
+
+// ---------------------------------------------------------------------------
+// AI output shapes — generate_lab review questions
+// ---------------------------------------------------------------------------
+
+export const generatedReviewQuestionSchema = z.object({
+  concept_index: z.number().int().nonnegative(),
+  question_text: z.string().min(1),
+  blooms_level: bloomsLevelSchema,
+  evaluation_rubric: z.string().min(1),
+})
+export type GeneratedReviewQuestion = z.infer<typeof generatedReviewQuestionSchema>
+
+export const generatedReviewQuestionsSchema = z.object({
+  questions: z.array(generatedReviewQuestionSchema).min(1).max(12),
+})
+export type GeneratedReviewQuestions = z.infer<typeof generatedReviewQuestionsSchema>
+
+// ---------------------------------------------------------------------------
+// AI output shapes — evaluate_review concept evaluations
+// ---------------------------------------------------------------------------
+
+export const aiConceptEvaluationSchema = z.object({
+  review_response_id: z.string().uuid(),
+  concept_id: z.string().uuid(),
+  blooms_level: bloomsLevelSchema,
+  mastery_score: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string().min(1),
+})
+export type AiConceptEvaluation = z.infer<typeof aiConceptEvaluationSchema>
+
+export const aiConceptEvaluationsSchema = z.object({
+  evaluations: z.array(aiConceptEvaluationSchema).min(1),
+})
+export type AiConceptEvaluations = z.infer<typeof aiConceptEvaluationsSchema>
+
 // ---------------------------------------------------------------------------
 // Lab content JSON shape (labs.content)
 // ---------------------------------------------------------------------------

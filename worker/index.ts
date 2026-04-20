@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { processNextJob } from './lib/job-runner.js'
+import { processNextJob, sweepStuckJobs } from './lib/job-runner.js'
 
 // Register processors here as they are implemented (T8, T9, etc.)
 import './processors/parse-materials.js'
@@ -22,6 +22,11 @@ process.on('SIGINT', () => {
 })
 
 async function main() {
+  // Clean up any jobs left in `running` by a previous crash before we start
+  // pulling new work. A crashed worker never got to mark its own row failed,
+  // so without this the zombie row would sit there forever.
+  await sweepStuckJobs()
+
   console.log('[worker] Starting poll loop...')
   while (running) {
     try {

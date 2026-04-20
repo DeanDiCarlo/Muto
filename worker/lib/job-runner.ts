@@ -37,6 +37,11 @@ export type ProcessorFn = (job: GenerationJob) => Promise<Record<string, unknown
 // Registry of job processors keyed by job_type
 const processors = new Map<string, ProcessorFn>()
 
+// Hard ceiling on how long any single job may run before it's considered
+// stuck. Real jobs finish in seconds-to-minutes; this exists only to bound
+// crash-and-hang failure modes so the queue can't be blocked indefinitely.
+const JOB_TIMEOUT_MINUTES = 120
+
 /**
  * Register a processor for a given job_type.
  * Call this from each processor module (parse-materials.ts, generate-lab.ts, etc.)
@@ -105,9 +110,21 @@ export async function processNextJob(): Promise<boolean> {
     return true
   }
 
-  // Step 4: Execute the processor
+  // Step 4: Execute the processor under a wall-clock deadline.
+  // Note: Promise.race doesn't actually cancel the in-flight work — an orphaned
+  // fetch to an LLM provider may continue in the background until it returns or
+  // the process exits. What this guarantees is that the DB row gets marked
+  // failed and the queue unblocks so subsequent jobs can be picked up.
   try {
-    const outputPayload = await processor(job)
+    const outputPayload = await Promise.race([
+      processor(job),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Job exceeded ${JOB_TIMEOUT_MINUTES}-minute runtime limit`)),
+          JOB_TIMEOUT_MINUTES * 60 * 1000
+        )
+      ),
+    ])
     await markCompleted(job.id, outputPayload)
     console.log(`[job-runner] Job ${job.id} completed successfully.`)
   } catch (err) {
@@ -117,6 +134,46 @@ export async function processNextJob(): Promise<boolean> {
   }
 
   return true
+}
+
+/**
+ * One-shot cleanup pass: any job stuck in `running` longer than the runtime
+ * ceiling is marked `failed` so the queue can move on. Call this once at
+ * worker boot — it catches zombies left behind by crashes (OOM, SIGKILL,
+ * deploy mid-job, etc.) where the process died before it could mark its own
+ * row failed.
+ *
+ * Safe to run concurrently with live workers: we only touch rows whose
+ * `started_at` is older than the cutoff, and live jobs will have a much
+ * more recent `started_at`.
+ */
+export async function sweepStuckJobs(
+  maxRuntimeMinutes: number = JOB_TIMEOUT_MINUTES
+): Promise<void> {
+  const cutoff = new Date(Date.now() - maxRuntimeMinutes * 60 * 1000).toISOString()
+
+  const { data, error } = await supabase
+    .from('generation_jobs')
+    .update({
+      status: 'failed',
+      completed_at: new Date().toISOString(),
+      error_message: `Job exceeded ${maxRuntimeMinutes}-minute runtime limit (swept on worker boot)`,
+    })
+    .eq('status', 'running')
+    .lt('started_at', cutoff)
+    .select('id')
+
+  if (error) {
+    console.error('[job-runner] sweepStuckJobs failed:', error.message)
+    return
+  }
+
+  const count = data?.length ?? 0
+  if (count > 0) {
+    console.log(`[job-runner] Swept ${count} stuck running job${count === 1 ? '' : 's'}.`)
+  } else {
+    console.log('[job-runner] No stuck jobs found.')
+  }
 }
 
 // --- Internal helpers ---

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/accordion'
 import { LabCard, type LabJobStatus } from './lab-card'
 import { SortableList } from './sortable-list'
-import type { PlanModule, PlanLab } from '@/types/generation'
+import type { PlanModule, PlanLab } from '@muto/shared/generation'
 
 const DEFAULT_NEW_LAB: Omit<PlanLab, 'title'> = {
   source_material_ids: [],

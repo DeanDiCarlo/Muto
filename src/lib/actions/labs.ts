@@ -17,7 +17,7 @@ import type {
   BloomsLevel,
   BloomsStructure,
   LabContent,
-} from '@/types/generation'
+} from '@muto/shared/generation'
 
 // ---------------------------------------------------------------------------
 // Types

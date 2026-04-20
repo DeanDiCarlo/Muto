@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { registerProcessor, updateProgress, type GenerationJob } from '../lib/job-runner.js'
 import { supabase } from '../lib/supabase.js'
 import { trackUsage } from '../lib/cost-tracker.js'
-import { proposePlanPayloadSchema, planDataSchema } from '../../src/types/generation.js'
+import { proposePlanPayloadSchema, planDataSchema } from '@muto/shared/generation'
 import { buildProposePlanPrompt, buildContentMessage } from '../lib/prompts/propose-plan.js'
 
 const anthropic = new Anthropic()

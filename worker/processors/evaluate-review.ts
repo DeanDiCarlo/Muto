@@ -5,7 +5,7 @@ import { trackUsage } from '../lib/cost-tracker.js'
 import {
   evaluateReviewPayloadSchema,
   aiConceptEvaluationsSchema,
-} from '../../src/types/generation.js'
+} from '@muto/shared/generation'
 import {
   buildEvaluateReviewSystemPrompt,
   buildEvaluateReviewUserMessage,

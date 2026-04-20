@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import type { LabContent } from '@/types/generation'
+import type { LabContent } from '@muto/shared/generation'
 
 /**
  * Renders a lab's structured content for the professor's preview tab. Each

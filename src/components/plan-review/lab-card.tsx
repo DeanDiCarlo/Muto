@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { ConceptTag } from './concept-tag'
 import { SourcePicker } from './source-picker'
 import { cn } from '@/lib/utils'
-import type { PlanLab, BloomsLevel } from '@/types/generation'
+import type { PlanLab, BloomsLevel } from '@muto/shared/generation'
 
 const ALL_BLOOMS: BloomsLevel[] = [
   'remember',

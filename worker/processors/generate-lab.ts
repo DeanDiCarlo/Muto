@@ -9,7 +9,7 @@ import {
   type LabContent,
   type BloomsStructure,
   type BloomsLevel,
-} from '../../src/types/generation.js'
+} from '@muto/shared/generation'
 import {
   buildLabContentSystemPrompt,
   buildLabContentUserMessage,

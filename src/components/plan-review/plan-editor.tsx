@@ -25,7 +25,7 @@ import {
   planDataSchema,
   type PlanData,
   type PlanModule,
-} from '@/types/generation'
+} from '@muto/shared/generation'
 
 type GenerationPlanRow = {
   id: string

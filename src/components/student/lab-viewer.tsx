@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import { Badge } from '@/components/ui/badge'
-import type { LabSection } from '@/types/generation'
+import type { LabSection } from '@muto/shared/generation'
 
 export function sectionIdFor(section: LabSection, idx: number): string {
   const slug = section.heading

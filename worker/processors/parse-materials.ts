@@ -3,7 +3,7 @@ import { pdf } from 'pdf-to-img'
 import { registerProcessor, updateProgress, type GenerationJob } from '../lib/job-runner.js'
 import { supabase } from '../lib/supabase.js'
 import { trackUsage } from '../lib/cost-tracker.js'
-import { parseMaterialsPayloadSchema, parsedPageSchema, type ParsedPage } from '../../src/types/generation.js'
+import { parseMaterialsPayloadSchema, parsedPageSchema, type ParsedPage } from '@muto/shared/generation'
 
 const anthropic = new Anthropic()
 

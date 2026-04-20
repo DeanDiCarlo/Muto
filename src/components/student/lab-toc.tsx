@@ -1,4 +1,4 @@
-import type { LabSection } from '@/types/generation'
+import type { LabSection } from '@muto/shared/generation'
 import { sectionIdFor } from './lab-viewer'
 
 export function LabToc({ sections }: { sections: LabSection[] }) {

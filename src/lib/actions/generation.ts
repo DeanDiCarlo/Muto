@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { planDataSchema, type PlanData } from '@/types/generation'
+import { planDataSchema, type PlanData } from '@muto/shared/generation'
 
 // ---------------------------------------------------------------------------
 // Auth helpers

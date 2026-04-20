@@ -9,7 +9,7 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
-import { labContentSchema, type LabContent, type BloomsStructure } from '@/types/generation'
+import { labContentSchema, type LabContent, type BloomsStructure } from '@muto/shared/generation'
 
 // ---------------------------------------------------------------------------
 // getLabForStudent

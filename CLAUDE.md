@@ -31,8 +31,8 @@ Muto is an EdTech SaaS platform that transforms professors' existing course mate
 │   └── commands/                # Custom slash commands
 │       ├── plan.md              # Architecture planning mode
 │       ├── implement.md         # Implementation mode
-│       ├── review.md            # Code review mode
-│       ├── schema-check.md      # Validate against SCHEMA.md
+│       ├── sprint.md            # Converts plans to topic ordered goal driven sprints
+│       ├── verify.md            # Validate against SCHEMA.md and write tests to verify integrity
 │       └── generate-migration.md # Create Supabase migration
 ├── src/
 │   ├── app/                     # Next.js App Router pages and layouts

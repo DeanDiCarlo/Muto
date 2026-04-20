@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+.next
+.git
+.vercel
+.claude
+coverage
+*.log
+.env*
+!.env.local.example

@@ -1,7 +1,12 @@
 'use server'
 
+// NOTE (dev stub): auth is resolved via `getCurrentUser()` which reads the
+// `muto-dev-user` cookie. There's no Supabase Auth JWT in dev, so the SSR
+// client can't satisfy RLS — we use the admin client and enforce ownership
+// manually via `assertCourseAccess`. Mirrors the pattern in courses.ts.
+// Replace before production (swap to SSR client + RLS).
+
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -30,12 +35,12 @@ const uploadMaterialSchema = z.object({
 async function getAuthUser() {
   const user = await getCurrentUser()
   if (!user) throw new Error('Unauthorized')
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   return { supabase, user }
 }
 
 async function assertCourseAccess(courseId: string, userId: string) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Check if user is course owner
   const { data: course } = await supabase

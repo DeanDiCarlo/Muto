@@ -1,7 +1,11 @@
 'use server'
 
+// NOTE (dev stub): same rationale as materials.ts and courses.ts — dev has
+// no Supabase Auth JWT, so all queries go through the admin client and
+// ownership is enforced manually via `assertCourseAccess`.
+// Replace before production (swap to SSR client + RLS).
+
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
 import { planDataSchema, type PlanData } from '@muto/shared/generation'
@@ -13,12 +17,12 @@ import { planDataSchema, type PlanData } from '@muto/shared/generation'
 async function getAuthUser() {
   const user = await getCurrentUser()
   if (!user) throw new Error('Unauthorized')
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   return { supabase, user }
 }
 
 async function assertCourseAccess(courseId: string, userId: string) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: course } = await supabase
     .from('courses')

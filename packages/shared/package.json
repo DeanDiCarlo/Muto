@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./generation": "./src/generation.ts"
+    "./generation": "./src/generation.ts",
+    "./config": "./src/config.ts"
   },
   "dependencies": {
     "zod": "^3.24.0"

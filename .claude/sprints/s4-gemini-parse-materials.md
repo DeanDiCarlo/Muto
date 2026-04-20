@@ -1,6 +1,8 @@
-# Sprint S4: Gemini parse_materials migration + first real lab
+# Sprint S4: Gemini parse_materials migration + first real lab — **PAUSED (2026-04-20)**
 
-**Goal**: Swap the OOM-prone Claude-vision rasterization pipeline for Gemini 2.5 Flash's Files API, then drive a real upload all the way through parse → propose_plan → approve → generate_lab to produce the first actual lab on Railway free tier.
+> **Status: PAUSED.** Subsumed by the Northstar Rebuild plan at `.claude/plans/get-200-in-optimized-swing.md`. T1, T2, T3, T6 already landed (commits `e26bd35`, `1198cde`) and their outputs feed S6 (generator rewrite). **Do NOT execute T4, T5, or T7 against the current text-only pipeline — S6 rewrites `generate_lab` to produce Sandpack React, and the parse-materials rewrite lives inside that sprint.** When reopening S4, reconcile against the new sprints: S4' (slug + schema), S5 (retrieval), S6 (generator), S7 (frontend).
+
+**Original goal**: Swap the OOM-prone Claude-vision rasterization pipeline for Gemini 2.5 Flash's Files API, then drive a real upload all the way through parse → propose_plan → approve → generate_lab to produce the first actual lab on Railway free tier.
 
 **Estimated sessions**: 3–4 (most weight on S4-T4 rewrite and S4-T7 integration)
 

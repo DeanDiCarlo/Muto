@@ -35,6 +35,16 @@ export const parsedPageSchema = z.object({
 })
 export type ParsedPage = z.infer<typeof parsedPageSchema>
 
+// Whole-document wrapper used when an LLM processes the full source in one
+// call (see worker/processors/parse-materials.ts on Gemini Files API). Kept
+// separate from parsedPageSchema so the per-page consumers in the DB-insert
+// path don't need to change — callers just iterate `parsed.pages` and reuse
+// the same parsedPageSchema/parsedBlockSchema downstream.
+export const parsedDocumentSchema = z.object({
+  pages: z.array(parsedPageSchema),
+})
+export type ParsedDocument = z.infer<typeof parsedDocumentSchema>
+
 // ---------------------------------------------------------------------------
 // Generation plan data (matches generation_plans.plan_data JSON shape)
 // ---------------------------------------------------------------------------

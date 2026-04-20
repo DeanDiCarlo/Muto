@@ -12,8 +12,6 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY worker/package.json ./worker/
 
-# Include devDependencies so tsx is available at runtime.
-ENV NODE_ENV=development
 RUN npm ci
 
 # Now bring in the actual source. The app under src/ is NOT needed

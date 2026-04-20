@@ -1,11 +1,18 @@
 import { AppShell } from '@/components/shell/app-shell'
+import { getCurrentUser } from '@/lib/auth'
 
-export default function ProfessorLayout({
+export default async function ProfessorLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // T4 will replace this with `await getCurrentUser()` and pass real user.
-  // For now the shell renders without a user; the top-bar shows "Sign in".
-  return <AppShell role="professor">{children}</AppShell>
+  const current = await getCurrentUser()
+  const user = current
+    ? { id: current.id, name: current.name, email: current.email }
+    : undefined
+  return (
+    <AppShell role="professor" user={user}>
+      {children}
+    </AppShell>
+  )
 }

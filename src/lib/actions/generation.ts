@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUser } from '@/lib/auth'
 import { planDataSchema, type PlanData } from '@muto/shared/generation'
 
 // ---------------------------------------------------------------------------
@@ -10,12 +11,9 @@ import { planDataSchema, type PlanData } from '@muto/shared/generation'
 // ---------------------------------------------------------------------------
 
 async function getAuthUser() {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Unauthorized')
   const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) throw new Error('Unauthorized')
   return { supabase, user }
 }
 

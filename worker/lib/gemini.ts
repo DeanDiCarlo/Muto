@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
-import 'dotenv/config'
+import './env.js'
 
 // Worker uses Google's unified GenAI SDK (@google/genai) to talk to Gemini.
 // One client instance handles both Flash and Pro — the model is selected per

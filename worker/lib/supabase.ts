@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import 'dotenv/config'
+import './env.js'
 
 // Worker uses service role — bypasses RLS for job processing.
 // Uses SUPABASE_URL (not NEXT_PUBLIC_) since this is a server-only Node.js process.

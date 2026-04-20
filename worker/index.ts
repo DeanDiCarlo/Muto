@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import './lib/env.js'
 import { processNextJob, sweepStuckJobs } from './lib/job-runner.js'
 
 // Register processors here as they are implemented (T8, T9, etc.)

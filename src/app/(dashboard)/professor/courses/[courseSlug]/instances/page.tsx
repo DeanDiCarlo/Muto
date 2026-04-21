@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { requireProfessor } from '@/lib/auth'
-import { getCourse } from '@/lib/actions/courses'
+import { getCourseBySlug } from '@/lib/actions/courses'
 import { listInstances } from '@/lib/actions/instances'
 import { InjectBreadcrumbLabel } from '@/lib/utils/breadcrumb-context'
 import { PageHeader } from '@/components/shell/page-header'
@@ -13,26 +13,24 @@ import { InstanceCard } from '@/components/professor/instance-card'
 export default async function CourseInstancesPage({
   params,
 }: {
-  params: Promise<{ courseId: string }>
+  params: Promise<{ courseSlug: string }>
 }) {
-  const { courseId } = await params
-  await requireProfessor(`/professor/courses/${courseId}/instances`)
+  const { courseSlug } = await params
+  await requireProfessor(`/professor/courses/${courseSlug}/instances`)
 
-  const [course, instances] = await Promise.all([
-    getCourse(courseId),
-    listInstances(courseId),
-  ])
-
+  const course = await getCourseBySlug(courseSlug)
   if (!course) notFound()
+
+  const instances = await listInstances(course.id)
 
   return (
     <>
-      <InjectBreadcrumbLabel segmentKey={courseId} value={course.title} />
+      <InjectBreadcrumbLabel segmentKey={courseSlug} value={course.title} />
       <PageHeader
         title="Instances"
         description="A course instance is one semester's offering."
         actions={
-          <InstanceCreateDialog courseId={courseId}>
+          <InstanceCreateDialog courseId={course.id}>
             <Button>New instance</Button>
           </InstanceCreateDialog>
         }
@@ -44,7 +42,7 @@ export default async function CourseInstancesPage({
           title="No instances yet"
           description="Create one to get a join code your students can use."
           action={
-            <InstanceCreateDialog courseId={courseId}>
+            <InstanceCreateDialog courseId={course.id}>
               <Button>New instance</Button>
             </InstanceCreateDialog>
           }

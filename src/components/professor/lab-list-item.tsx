@@ -9,15 +9,15 @@ import type { LabListRow } from '@/lib/actions/labs'
  * Plain server component — no interactivity needed.
  */
 export function LabListItem({
-  courseId,
+  courseSlug,
   lab,
 }: {
-  courseId: string
+  courseSlug: string
   lab: LabListRow
 }) {
   return (
     <Link
-      href={`/professor/courses/${courseId}/labs/${lab.id}`}
+      href={`/professor/courses/${courseSlug}/labs/${lab.slug}`}
       className="group block focus:outline-none"
     >
       <Card

@@ -16,13 +16,13 @@ import type { CourseOverview } from '@/lib/actions/courses'
  *   7. Else → Live, show join code
  */
 export function NextStepCard({
-  courseId,
+  courseSlug,
   overview,
 }: {
-  courseId: string
+  courseSlug: string
   overview: CourseOverview
 }) {
-  const base = `/professor/courses/${courseId}`
+  const base = `/professor/courses/${courseSlug}`
   const step = deriveStep(overview)
 
   return (

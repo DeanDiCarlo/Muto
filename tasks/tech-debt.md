@@ -58,3 +58,33 @@ Running list of intentional short-term workarounds. Each entry names the file(s)
 **State**: Single-file upload only. `<input>` has no `multiple` attribute; `handleDrop` and `handleFileSelect` grab `files[0]`.
 
 **Fix**: Add `multiple` to the input, iterate `Array.from(files)` through `handleUpload`. Decide sequential vs parallel based on how the `uploadMaterial` Server Action handles concurrent inserts (should be fine — each creates its own `parse_materials` job).
+
+---
+
+## 4. `pdf-to-img` + Claude-vision parse path retained despite Gemini migration being planned
+
+**Files**: `worker/package.json`, `worker/processors/parse-materials.ts`
+
+**State**: Sprint S4 paused mid-flight (see `.claude/sprints/s4-gemini-parse-materials.md`). T1/T2/T3/T6 (Gemini SDK client, shared schema, pricing helper, downstream smoke) landed, but T4 — the actual rewrite of `parse-materials.ts` — was deferred into S6 because the generator rewrite needs to ship its new parse output shape in the same pass. Meanwhile `pdf-to-img` + the page-rasterization / Claude-vision code path remain wired up, and the Gemini client + pricing helper have no caller.
+
+**Why it's wrong**: OOM risk on Railway free tier (the whole reason S4 was scoped to begin with), plus dead-but-shipped Gemini client grows bitrot. The longer the half-migration sits, the higher the chance a future change touches both paths and diverges them.
+
+**Fix when S6 lands**:
+1. Delete the page-raster loop and Claude-vision prompt from `worker/processors/parse-materials.ts`; swap in the Gemini Files API flow per `.claude/plans/gemini-parse-materials-migration.md`.
+2. Remove `pdf-to-img` from `worker/package.json` and regenerate the lockfile.
+3. Delete any helpers that become dead (buffer accumulator, per-page progress loop).
+
+---
+
+## 5. DOCX / PPTX uploads not supported by the parse pipeline
+
+**Files**: `worker/processors/parse-materials.ts`, `src/components/material-upload.tsx` (MIME allowlist)
+
+**State**: Only PDF / PNG / JPEG flow through parse. DOCX and PPTX uploads are either rejected client-side or crash the Claude-vision path when they slip through. The Miami pilot needs both — professors upload lecture decks and Word-formatted notes routinely.
+
+**Why it's wrong**: Visible product gap. Professor uploads their course and half the material silently no-ops.
+
+**Fix — decision deferred to S6 planning pass**:
+- **Option A — LibreOffice → PDF shim in the Dockerfile.** Install `libreoffice-core` in the worker image; on DOCX/PPTX input, shell out to `soffice --headless --convert-to pdf` and feed the resulting PDF to the Gemini Files API. Preserves layout + figures. Costs ~300MB image bloat and a cold-start hit.
+- **Option B — Text-only extract via `mammoth` (DOCX) + `pptx-parser` (PPTX).** Fast, no Docker changes, but discards inline images, diagrams, and slide visuals — which is most of the pedagogical signal in a lecture deck. Acceptable fallback for DOCX-of-prose, unacceptable for most PPTX.
+- **Don't pick here.** The decision belongs in the S6 planning pass once we know how much latency budget the rewritten pipeline has left.

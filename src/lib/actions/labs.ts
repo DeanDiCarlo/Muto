@@ -27,6 +27,7 @@ export type LabGenerationStatus = 'pending' | 'generating' | 'complete' | 'faile
 
 export type LabListRow = {
   id: string
+  slug: string
   title: string
   position: number
   moduleId: string
@@ -106,6 +107,7 @@ export async function listLabsForCourse(courseId: string): Promise<LabListRow[]>
     .select(
       `
       id,
+      slug,
       title,
       position,
       generation_status,
@@ -131,6 +133,7 @@ export async function listLabsForCourse(courseId: string): Promise<LabListRow[]>
 
     return {
       id: l.id,
+      slug: l.slug,
       title: l.title,
       position: l.position,
       moduleId: l.module_id,
@@ -257,6 +260,81 @@ export async function getLab(labId: string): Promise<LabDetail | null> {
       fileName: s.file_name,
       fileType: s.file_type,
     })),
+  }
+}
+
+/**
+ * Slug-scoped lookup. Returns `{ lab, course }` so the page layer can redirect
+ * when a student hand-types a lab slug that belongs to a different course
+ * (migration 006 scope: labs(course_id, slug) is unique — so mismatch is the
+ * lab-not-in-this-course case, not a duplicate).
+ *
+ * Returns null if either slug fails to resolve, the lab doesn't live under
+ * the resolved course, or the caller doesn't own the course.
+ */
+export async function getLabBySlug(
+  courseSlug: string,
+  labSlug: string
+): Promise<{
+  lab: {
+    id: string
+    title: string
+    slug: string
+    description: string | null
+    content: LabContent | null
+    bloomsStructure: BloomsStructure | null
+    generationStatus: LabGenerationStatus
+    generatedAt: string | null
+    createdAt: string
+    moduleId: string
+    courseId: string
+  }
+  course: { id: string; slug: string; title: string }
+} | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+
+  const admin = createAdminClient()
+
+  const { data: course, error: courseErr } = await admin
+    .from('courses')
+    .select('id, slug, title')
+    .eq('institution_id', user.institutionId)
+    .eq('created_by', user.id)
+    .eq('slug', courseSlug)
+    .maybeSingle()
+
+  if (courseErr || !course) return null
+
+  const { data: lab, error: labErr } = await admin
+    .from('labs')
+    .select(
+      `
+      id, title, slug, description, content, blooms_structure,
+      generation_status, generated_at, created_at, module_id, course_id
+      `
+    )
+    .eq('course_id', course.id)
+    .eq('slug', labSlug)
+    .maybeSingle()
+
+  if (labErr || !lab) return null
+
+  return {
+    lab: {
+      id: lab.id,
+      title: lab.title,
+      slug: lab.slug,
+      description: lab.description,
+      content: (lab.content as LabContent | null) ?? null,
+      bloomsStructure: (lab.blooms_structure as BloomsStructure | null) ?? null,
+      generationStatus: lab.generation_status as LabGenerationStatus,
+      generatedAt: lab.generated_at,
+      createdAt: lab.created_at,
+      moduleId: lab.module_id,
+      courseId: lab.course_id,
+    },
+    course: { id: course.id, slug: course.slug, title: course.title },
   }
 }
 

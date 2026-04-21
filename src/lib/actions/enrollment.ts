@@ -119,7 +119,7 @@ export async function listMyEnrollments() {
     const { data, error } = await admin
       .from('enrollments')
       .select(
-        'id, enrolled_at, course_instance_id, course_instances!inner(id, semester, is_active, course_id, courses!inner(id, title, subject_area))'
+        'id, enrolled_at, course_instance_id, course_instances!inner(id, slug, semester, is_active, course_id, courses!inner(id, title, subject_area))'
       )
       .eq('user_id', user.id)
       .order('enrolled_at', { ascending: false })
@@ -134,6 +134,7 @@ export async function listMyEnrollments() {
       course_instance_id: string
       course_instances: {
         id: string
+        slug: string
         semester: string
         is_active: boolean
         course_id: string
@@ -145,6 +146,7 @@ export async function listMyEnrollments() {
     const enrollments = rows.map((r) => ({
       enrollmentId: r.id,
       instanceId: r.course_instances.id,
+      instanceSlug: r.course_instances.slug,
       courseId: r.course_instances.course_id,
       courseTitle: r.course_instances.courses.title,
       subjectArea: r.course_instances.courses.subject_area,
@@ -158,6 +160,38 @@ export async function listMyEnrollments() {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return { success: false as const, error: message }
   }
+}
+
+// ---------------------------------------------------------------------------
+// getInstanceBySlug — slug-scoped lookup for student routes (migration 006).
+// Scoped to the caller's enrollment; returns null if the current user is not
+// enrolled in the matched instance.
+// ---------------------------------------------------------------------------
+
+export async function getInstanceBySlug(slug: string) {
+  const user = await getCurrentUser()
+  if (!user) return null
+
+  const admin = createAdminClient()
+
+  const { data: instance, error } = await admin
+    .from('course_instances')
+    .select('id, slug, course_id, semester, is_active')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (error || !instance) return null
+
+  const { data: enrollment } = await admin
+    .from('enrollments')
+    .select('id')
+    .eq('course_instance_id', instance.id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!enrollment) return null
+
+  return instance
 }
 
 // ---------------------------------------------------------------------------

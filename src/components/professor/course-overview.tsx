@@ -15,13 +15,13 @@ import { NextStepCard } from './next-step-card'
  * Client component because the title editor manages inline edit state.
  */
 export function CourseOverview({ overview }: { overview: CourseOverview }) {
-  const base = `/professor/courses/${overview.course.id}`
+  const base = `/professor/courses/${overview.course.slug}`
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <CourseHeader overview={overview} />
 
-      <NextStepCard courseId={overview.course.id} overview={overview} />
+      <NextStepCard courseSlug={overview.course.slug} overview={overview} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <PipelineTile

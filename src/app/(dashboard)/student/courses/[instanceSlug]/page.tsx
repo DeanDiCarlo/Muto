@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { requireStudent } from '@/lib/auth'
-import { getStudentCourseView } from '@/lib/actions/enrollment'
+import { getInstanceBySlug, getStudentCourseView } from '@/lib/actions/enrollment'
 import { PageHeader } from '@/components/shell/page-header'
 import { EmptyState } from '@/components/shell/empty-state'
 import { CourseTree } from '@/components/student/course-tree'
@@ -11,23 +11,26 @@ import { Layers } from 'lucide-react'
 export default async function StudentCourseHomePage({
   params,
 }: {
-  params: Promise<{ instanceId: string }>
+  params: Promise<{ instanceSlug: string }>
 }) {
-  const { instanceId } = await params
-  await requireStudent(`/student/courses/${instanceId}`)
+  const { instanceSlug } = await params
+  await requireStudent(`/student/courses/${instanceSlug}`)
 
-  const result = await getStudentCourseView(instanceId)
+  const instance = await getInstanceBySlug(instanceSlug)
+  if (!instance) notFound()
+
+  const result = await getStudentCourseView(instance.id)
   if (!result.success) notFound()
 
-  const { course, instance, modules } = result
+  const { course, modules } = result
 
   return (
     <>
-      <InjectBreadcrumbLabel segmentKey={instanceId} value={course.title} />
+      <InjectBreadcrumbLabel segmentKey={instanceSlug} value={course.title} />
 
       <PageHeader
         title={course.title}
-        description={instance.semester}
+        description={result.instance.semester}
         actions={
           course.subjectArea ? (
             <Badge variant="secondary">
@@ -44,7 +47,7 @@ export default async function StudentCourseHomePage({
           description="Your professor hasn't added any modules to this course yet. Check back soon!"
         />
       ) : (
-        <CourseTree modules={modules} instanceId={instanceId} />
+        <CourseTree modules={modules} instanceSlug={instanceSlug} />
       )}
     </>
   )

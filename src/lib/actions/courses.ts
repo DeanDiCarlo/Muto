@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
+import { slugify } from '@/lib/utils/slug'
 
 // ---------------------------------------------------------------------------
 // Zod schemas
@@ -36,6 +37,7 @@ const updateCourseSchema = z.object({
 
 export type CourseCardData = {
   id: string
+  slug: string
   title: string
   description: string | null
   subjectArea: string | null
@@ -51,6 +53,7 @@ export type PlanStatus = 'draft' | 'approved' | 'generating' | 'completed'
 export type CourseOverview = {
   course: {
     id: string
+    slug: string
     title: string
     description: string | null
     subjectArea: string | null
@@ -100,23 +103,36 @@ export async function createCourse(
   }
 
   const admin = createAdminClient()
-  const { data, error } = await admin
+  // Id-suffix matches the migration-006 backfill pattern; no collision retry
+  // needed because the suffix is derived from the row's own uuid.
+  const { data: inserted, error: insertErr } = await admin
     .from('courses')
     .insert({
       institution_id: user.institutionId,
       created_by: user.id,
       title: parsed.data.title,
+      slug: 'pending',
       subject_area: parsed.data.subjectArea || null,
       description: parsed.data.description || null,
     })
     .select('id')
     .single()
 
-  if (error || !data) {
-    return { error: error?.message ?? 'Failed to create course' }
+  if (insertErr || !inserted) {
+    return { error: insertErr?.message ?? 'Failed to create course' }
   }
 
-  redirect(`/professor/courses/${data.id}`)
+  const slug = `${slugify(parsed.data.title) || 'course'}-${inserted.id.slice(0, 6)}`
+  const { error: slugErr } = await admin
+    .from('courses')
+    .update({ slug })
+    .eq('id', inserted.id)
+
+  if (slugErr) {
+    return { error: slugErr.message }
+  }
+
+  redirect(`/professor/courses/${slug}`)
 }
 
 /**
@@ -133,6 +149,7 @@ export async function listCoursesForProfessor(): Promise<CourseCardData[]> {
     .select(
       `
       id,
+      slug,
       title,
       description,
       subject_area,
@@ -164,6 +181,7 @@ export async function listCoursesForProfessor(): Promise<CourseCardData[]> {
 
     return {
       id: c.id,
+      slug: c.slug,
       title: c.title,
       description: c.description,
       subjectArea: c.subject_area,
@@ -195,7 +213,7 @@ export async function getCourseOverview(courseId: string): Promise<CourseOvervie
       .from('courses')
       .select(
         `
-        id, title, description, subject_area, created_at,
+        id, slug, title, description, subject_area, created_at,
         source_materials ( id ),
         generation_plans ( id, status, created_at ),
         modules ( id, labs ( id, generation_status ) ),
@@ -248,6 +266,7 @@ export async function getCourseOverview(courseId: string): Promise<CourseOvervie
   return {
     course: {
       id: c.id,
+      slug: c.slug,
       title: c.title,
       description: c.description,
       subjectArea: c.subject_area,
@@ -324,9 +343,30 @@ export async function getCourse(courseId: string) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('courses')
-    .select('id, title, description, subject_area, institution_id, created_by, created_at')
+    .select('id, title, slug, description, subject_area, institution_id, created_by, created_at')
     .eq('id', parsedId.data)
     .eq('created_by', user.id)
+    .single()
+
+  if (error || !data) return null
+  return data
+}
+
+/**
+ * Slug-scoped counterpart to `getCourse`. Scoped to (institution_id, created_by)
+ * via the current user, matching the unique index on courses.
+ */
+export async function getCourseBySlug(slug: string) {
+  const user = await getCurrentUser()
+  if (!user) return null
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('courses')
+    .select('id, title, slug, description, subject_area, institution_id, created_by, created_at')
+    .eq('institution_id', user.institutionId)
+    .eq('created_by', user.id)
+    .eq('slug', slug)
     .single()
 
   if (error || !data) return null

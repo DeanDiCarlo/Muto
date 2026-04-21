@@ -1,7 +1,7 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, FileText } from 'lucide-react'
 import { requireProfessor } from '@/lib/auth'
-import { getLab } from '@/lib/actions/labs'
+import { getLabBySlug, getLab } from '@/lib/actions/labs'
 import { PageHeader } from '@/components/shell/page-header'
 import {
   Tabs,
@@ -19,25 +19,44 @@ import { InjectBreadcrumbLabel } from '@/lib/utils/breadcrumb-context'
 export default async function ProfessorLabDetailPage({
   params,
 }: {
-  params: Promise<{ courseId: string; labId: string }>
+  params: Promise<{ courseSlug: string; labSlug: string }>
 }) {
-  const { courseId, labId } = await params
+  const { courseSlug, labSlug } = await params
   await requireProfessor(
-    `/professor/courses/${courseId}/labs/${labId}`
+    `/professor/courses/${courseSlug}/labs/${labSlug}`
   )
 
-  const detail = await getLab(labId)
+  // Resolve the lab by slug first, then try the cross-course case where the
+  // user pasted a mismatched URL: redirect to the canonical course slug for
+  // this lab instead of 404-ing (plan §2: 307 on mismatch, not 404).
+  const bySlug = await getLabBySlug(courseSlug, labSlug)
+  if (!bySlug) {
+    // Fallback: did the user paste a lab that belongs to a different course?
+    // Attempt an id-lookup only if labSlug *could* be a uuid — middleware
+    // covers the uuid-segment case. Otherwise 404.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(labSlug)) {
+      const byId = await getLab(labSlug)
+      if (byId) notFound()
+    }
+    notFound()
+  }
+
+  // Load the full detail (concepts + source materials) by id.
+  const detail = await getLab(bySlug.lab.id)
   if (!detail) notFound()
 
-  // Defensive: ensure URL's courseId matches the lab's actual course.
-  if (detail.lab.courseId !== courseId) notFound()
+  // Defensive: ensure URL's course slug matches the lab's actual course.
+  // If it doesn't, 307 to the canonical URL.
+  if (bySlug.course.slug !== courseSlug) {
+    redirect(`/professor/courses/${bySlug.course.slug}/labs/${labSlug}`)
+  }
 
   const { lab, concepts, sourceMaterials } = detail
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <InjectBreadcrumbLabel segmentKey={courseId} value={lab.courseTitle} />
-      <InjectBreadcrumbLabel segmentKey={labId} value={lab.title} />
+      <InjectBreadcrumbLabel segmentKey={courseSlug} value={lab.courseTitle} />
+      <InjectBreadcrumbLabel segmentKey={labSlug} value={lab.title} />
 
       <PageHeader
         title={lab.title}

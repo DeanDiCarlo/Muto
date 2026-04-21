@@ -9,6 +9,13 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
 import { planDataSchema, type PlanData } from '@muto/shared/generation'
+import { slugify } from '@/lib/utils/slug'
+
+// Local wrapper so the empty-slug fallback stays consistent with the
+// createCourse pattern.
+function slugifyTitle(title: string): string {
+  return slugify(title) || 'lab'
+}
 
 // ---------------------------------------------------------------------------
 // Auth helpers
@@ -228,21 +235,35 @@ export async function approvePlan(planId: string) {
         for (let labIndex = 0; labIndex < planModule.labs.length; labIndex++) {
           const planLab = planModule.labs[labIndex]
 
-          // Create lab
-          const { data: labRow, error: labError } = await admin
+          // Create lab (migration 006: course_id is denormalized from modules.course_id
+          // so labs(course_id, slug) can be unique-indexed without a trigger; slug
+          // mirrors the postgres backfill pattern used in migration 006).
+          const { data: labInserted, error: labError } = await admin
             .from('labs')
             .insert({
               module_id: moduleRow.id,
+              course_id: plan.course_id,
               title: planLab.title,
+              slug: 'pending',
               position: labIndex,
               generation_status: 'pending' as const,
             })
             .select('id')
             .single()
 
-          if (labError || !labRow) {
+          if (labError || !labInserted) {
             throw new Error(`Failed to create lab "${planLab.title}": ${labError?.message}`)
           }
+
+          const labSlug = `${slugifyTitle(planLab.title)}-${labInserted.id.slice(0, 6)}`
+          const { error: slugErr } = await admin
+            .from('labs')
+            .update({ slug: labSlug })
+            .eq('id', labInserted.id)
+          if (slugErr) {
+            throw new Error(`Failed to set slug for lab "${planLab.title}": ${slugErr.message}`)
+          }
+          const labRow = labInserted
           labsCreated++
 
           // Link source materials to this lab

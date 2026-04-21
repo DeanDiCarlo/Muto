@@ -14,7 +14,7 @@ export function CourseCard({ course }: { course: CourseCardData }) {
 
   return (
     <Link
-      href={`/professor/courses/${course.id}`}
+      href={`/professor/courses/${course.slug}`}
       className="group block focus:outline-none"
     >
       <Card className="h-full transition-colors group-hover:bg-foreground/[0.02] group-focus-visible:ring-2 group-focus-visible:ring-ring">

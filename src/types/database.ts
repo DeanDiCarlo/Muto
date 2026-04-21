@@ -71,6 +71,7 @@ export type Database = {
           institution_id: string
           created_by: string
           title: string
+          slug: string
           description: string | null
           subject_area: string | null
           created_at: string
@@ -80,6 +81,7 @@ export type Database = {
           institution_id: string
           created_by: string
           title: string
+          slug: string
           description?: string | null
           subject_area?: string | null
           created_at?: string
@@ -89,6 +91,7 @@ export type Database = {
           institution_id?: string
           created_by?: string
           title?: string
+          slug?: string
           description?: string | null
           subject_area?: string | null
           created_at?: string
@@ -99,6 +102,7 @@ export type Database = {
           id: string
           course_id: string
           semester: string
+          slug: string
           join_code: string
           join_link: string | null
           is_active: boolean
@@ -108,6 +112,7 @@ export type Database = {
           id?: string
           course_id: string
           semester: string
+          slug: string
           join_code: string
           join_link?: string | null
           is_active?: boolean
@@ -117,6 +122,7 @@ export type Database = {
           id?: string
           course_id?: string
           semester?: string
+          slug?: string
           join_code?: string
           join_link?: string | null
           is_active?: boolean
@@ -199,10 +205,16 @@ export type Database = {
         Row: {
           id: string
           module_id: string
+          course_id: string
           title: string
+          slug: string
           description: string | null
           position: number
           content: Json | null
+          content_version: number
+          sandpack_files: Json | null
+          tutor_context: Json | null
+          generation_context_snapshot: Json | null
           blooms_structure: Json | null
           generation_status: Database['public']['Enums']['lab_generation_status']
           generated_at: string | null
@@ -211,10 +223,16 @@ export type Database = {
         Insert: {
           id?: string
           module_id: string
+          course_id: string
           title: string
+          slug: string
           description?: string | null
           position?: number
           content?: Json | null
+          content_version?: number
+          sandpack_files?: Json | null
+          tutor_context?: Json | null
+          generation_context_snapshot?: Json | null
           blooms_structure?: Json | null
           generation_status?: Database['public']['Enums']['lab_generation_status']
           generated_at?: string | null
@@ -223,10 +241,16 @@ export type Database = {
         Update: {
           id?: string
           module_id?: string
+          course_id?: string
           title?: string
+          slug?: string
           description?: string | null
           position?: number
           content?: Json | null
+          content_version?: number
+          sandpack_files?: Json | null
+          tutor_context?: Json | null
+          generation_context_snapshot?: Json | null
           blooms_structure?: Json | null
           generation_status?: Database['public']['Enums']['lab_generation_status']
           generated_at?: string | null
@@ -333,6 +357,61 @@ export type Database = {
           chunk_text?: string
           chunk_index?: number
           created_at?: string
+        }
+      }
+      lab_embeddings: {
+        Row: {
+          id: string
+          lab_id: string
+          subject_area: string | null
+          embedding: string
+          embedded_text: string
+          quality_score: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          lab_id: string
+          subject_area?: string | null
+          embedding: string
+          embedded_text: string
+          quality_score?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          lab_id?: string
+          subject_area?: string | null
+          embedding?: string
+          embedded_text?: string
+          quality_score?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      cognitive_model_snapshots: {
+        Row: {
+          id: string
+          enrollment_id: string
+          lab_id: string | null
+          summary: Json
+          computed_at: string
+        }
+        Insert: {
+          id?: string
+          enrollment_id: string
+          lab_id?: string | null
+          summary: Json
+          computed_at?: string
+        }
+        Update: {
+          id?: string
+          enrollment_id?: string
+          lab_id?: string | null
+          summary?: Json
+          computed_at?: string
         }
       }
       concepts: {

@@ -60,11 +60,13 @@ function StatusBadge({ status }: { status: string }) {
 
 export function MaterialList({
   courseId,
+  courseSlug,
   initialMaterials,
   planStatus,
   allParsed,
 }: {
   courseId: string
+  courseSlug: string
   initialMaterials: MaterialWithStatus[]
   planStatus: 'draft' | 'approved' | 'generating' | 'completed' | null
   allParsed: boolean
@@ -213,7 +215,7 @@ export function MaterialList({
         <Card>
           <CardContent className="py-4 text-center text-sm">
             <Link
-              href={`/professor/courses/${courseId}/plan`}
+              href={`/professor/courses/${courseSlug}/plan`}
               className="font-medium text-primary hover:underline"
             >
               Plan ready for review →
@@ -229,7 +231,7 @@ export function MaterialList({
           <Card>
             <CardContent className="py-4 text-center text-sm">
               <Link
-                href={`/professor/courses/${courseId}/plan`}
+                href={`/professor/courses/${courseSlug}/plan`}
                 className="font-medium text-primary hover:underline"
               >
                 Generation in progress →

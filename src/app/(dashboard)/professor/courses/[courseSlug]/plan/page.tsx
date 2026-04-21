@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { getPlan } from '@/lib/actions/generation'
+import { getCourseBySlug } from '@/lib/actions/courses'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { PlanEditor } from '@/components/plan-review/plan-editor'
@@ -17,10 +19,13 @@ type PlanRow = {
 export default async function PlanPage({
   params,
 }: {
-  params: Promise<{ courseId: string }>
+  params: Promise<{ courseSlug: string }>
 }) {
-  const { courseId } = await params
-  const result = await getPlan(courseId)
+  const { courseSlug } = await params
+  const course = await getCourseBySlug(courseSlug)
+  if (!course) notFound()
+
+  const result = await getPlan(course.id)
 
   if (!result.success) {
     return (
@@ -42,7 +47,7 @@ export default async function PlanPage({
               modules, labs, and concepts here for your review.
             </p>
             <Button asChild>
-              <Link href={`/professor/courses/${courseId}/materials`}>
+              <Link href={`/professor/courses/${courseSlug}/materials`}>
                 Upload Materials
               </Link>
             </Button>

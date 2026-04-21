@@ -4,6 +4,7 @@ const config = {
   testEnvironment: 'node',
   moduleNameMapper: {
     '^next/server$': '<rootDir>/src/__mocks__/next-server.ts',
+    '^@/lib/auth$': '<rootDir>/src/__mocks__/lib-auth.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: { strict: true } }],

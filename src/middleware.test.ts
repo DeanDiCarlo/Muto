@@ -1,6 +1,5 @@
-import { isUuid } from './middleware'
+import { isUuid, proxy } from './proxy'
 import { NextRequest, NextResponse } from 'next/server'
-import middleware from './middleware'
 
 // ---------------------------------------------------------------------------
 // Mock @supabase/supabase-js so no network calls are made.
@@ -14,6 +13,8 @@ const mockFrom = jest.fn(() => ({ select: mockSelect }))
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({ from: mockFrom })),
 }))
+
+jest.mock('@/lib/auth', () => ({ DEV_USER_COOKIE: 'muto-dev-user' }))
 
 // Chain is re-created per call, so wire it up before each test.
 beforeEach(() => {
@@ -56,10 +57,22 @@ describe('isUuid', () => {
 // middleware — pass-through cases (no Supabase calls expected)
 // ---------------------------------------------------------------------------
 
-describe('middleware — pass-through', () => {
+// Helper: build a request with a valid dev session so the auth gate passes through.
+// The stub NextRequest is mutated directly to avoid hitting TypeScript's view
+// of the real next/server NextRequest constructor signature.
+function authed(url: string): Parameters<typeof proxy>[0] {
+  const req = new NextRequest(url) as unknown as {
+    nextUrl: { pathname: string; clone: () => unknown; split?: never }
+    cookies: { get: (name: string) => { value: string } | undefined }
+  }
+  req.cookies = { get: (name) => (name === 'muto-dev-user' ? { value: 'test' } : undefined) }
+  return req as unknown as Parameters<typeof proxy>[0]
+}
+
+describe('proxy — pass-through', () => {
   test('passes through when course segment is already a slug', async () => {
-    const req = new NextRequest('http://localhost/professor/courses/intro-quantum/labs/bell-states') as unknown as Parameters<typeof middleware>[0]
-    const res = await middleware(req)
+    const req = authed('http://localhost/professor/courses/intro-quantum/labs/bell-states')
+    const res = await proxy(req)
     expect(res).toBeInstanceOf(NextResponse)
     // No redirect URL → NextResponse.next() was returned.
     expect((res as unknown as { redirectUrl: () => string | undefined }).redirectUrl()).toBeUndefined()
@@ -67,8 +80,8 @@ describe('middleware — pass-through', () => {
   })
 
   test('passes through for student route with slug segment', async () => {
-    const req = new NextRequest('http://localhost/student/courses/s26-section-ac/labs/bell-states') as unknown as Parameters<typeof middleware>[0]
-    const res = await middleware(req)
+    const req = authed('http://localhost/student/courses/s26-section-ac/labs/bell-states')
+    const res = await proxy(req)
     expect((res as unknown as { redirectUrl: () => string | undefined }).redirectUrl()).toBeUndefined()
     expect(mockFrom).not.toHaveBeenCalled()
   })
@@ -78,14 +91,14 @@ describe('middleware — pass-through', () => {
 // middleware — UUID redirect (professor route)
 // ---------------------------------------------------------------------------
 
-describe('middleware — professor UUID redirect', () => {
+describe('proxy — professor UUID redirect', () => {
   const UUID = '123e4567-e89b-12d3-a456-426614174000'
 
   test('308 redirects UUID to display_slug on professor route', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: { display_slug: 'intro-quantum' }, error: null })
 
-    const req = new NextRequest(`http://localhost/professor/courses/${UUID}/labs/bell-states`) as unknown as Parameters<typeof middleware>[0]
-    const res = await middleware(req)
+    const req = new NextRequest(`http://localhost/professor/courses/${UUID}/labs/bell-states`) as unknown as Parameters<typeof proxy>[0]
+    const res = await proxy(req)
     const redirectUrl = (res as unknown as { redirectUrl: () => string | undefined }).redirectUrl()
 
     expect(redirectUrl).toContain('/professor/courses/intro-quantum/labs/bell-states')
@@ -93,12 +106,14 @@ describe('middleware — professor UUID redirect', () => {
     expect(mockFrom).toHaveBeenCalledWith('courses')
   })
 
-  test('passes through when UUID not found in DB', async () => {
+  test('falls through to auth gate when UUID not found in DB', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
-    const req = new NextRequest(`http://localhost/professor/courses/${UUID}`) as unknown as Parameters<typeof middleware>[0]
-    const res = await middleware(req)
-    expect((res as unknown as { redirectUrl: () => string | undefined }).redirectUrl()).toBeUndefined()
+    // No session cookie → auth gate redirects to /login (expected behavior).
+    const req = new NextRequest(`http://localhost/professor/courses/${UUID}`) as unknown as Parameters<typeof proxy>[0]
+    const res = await proxy(req)
+    const redirectUrl = (res as unknown as { redirectUrl: () => string | undefined }).redirectUrl()
+    expect(redirectUrl).toContain('/login')
   })
 })
 
@@ -106,14 +121,14 @@ describe('middleware — professor UUID redirect', () => {
 // middleware — UUID redirect (student route)
 // ---------------------------------------------------------------------------
 
-describe('middleware — student UUID redirect', () => {
+describe('proxy — student UUID redirect', () => {
   const UUID = '223e4567-e89b-12d3-a456-426614174001'
 
   test('308 redirects UUID to display_slug on student route', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: { display_slug: 's26-section-ac' }, error: null })
 
-    const req = new NextRequest(`http://localhost/student/courses/${UUID}/labs/bell-states`) as unknown as Parameters<typeof middleware>[0]
-    const res = await middleware(req)
+    const req = new NextRequest(`http://localhost/student/courses/${UUID}/labs/bell-states`) as unknown as Parameters<typeof proxy>[0]
+    const res = await proxy(req)
     const redirectUrl = (res as unknown as { redirectUrl: () => string | undefined }).redirectUrl()
 
     expect(redirectUrl).toContain('/student/courses/s26-section-ac/labs/bell-states')

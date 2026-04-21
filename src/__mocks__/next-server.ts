@@ -1,5 +1,5 @@
-// Minimal stubs for next/server used in middleware unit tests.
-// Only the surface area that src/middleware.ts touches is implemented.
+// Minimal stubs for next/server used in proxy unit tests.
+// Only the surface area that src/proxy.ts touches is implemented.
 
 export class NextURL {
   pathname: string
@@ -22,9 +22,14 @@ export class NextURL {
 
 export class NextRequest {
   nextUrl: NextURL
+  cookies: { get: (name: string) => { value: string } | undefined }
 
-  constructor(url: string) {
+  constructor(url: string, opts?: { cookies?: Record<string, string> }) {
     this.nextUrl = new NextURL(url)
+    const jar = opts?.cookies ?? {}
+    this.cookies = {
+      get: (name: string) => (name in jar ? { value: jar[name] } : undefined),
+    }
   }
 }
 

@@ -26,7 +26,7 @@ export default async function StudentCoursesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {enrollments.map((e) => (
-            <Link key={e.enrollmentId} href={`/student/courses/${e.instanceId}`}>
+            <Link key={e.enrollmentId} href={`/student/courses/${e.instanceSlug}`}>
               <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                 <CardContent className="pt-6">
                   <h2 className="font-semibold text-base leading-snug">

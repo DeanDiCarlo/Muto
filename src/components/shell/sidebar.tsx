@@ -20,6 +20,7 @@ export type SidebarRole = 'professor' | 'student'
 
 export type CourseContext = {
   id: string
+  slug: string
   title: string
 }
 
@@ -36,8 +37,8 @@ function profTopNav(): NavItem[] {
   ]
 }
 
-function profCourseNav(courseId: string): NavItem[] {
-  const base = `/professor/courses/${courseId}`
+function profCourseNav(courseSlug: string): NavItem[] {
+  const base = `/professor/courses/${courseSlug}`
   return [
     { href: base, label: 'Overview', icon: Home, match: 'exact' },
     { href: `${base}/materials`, label: 'Materials', icon: FileStack, match: 'prefix' },
@@ -53,8 +54,8 @@ function studentTopNav(): NavItem[] {
   ]
 }
 
-function studentCourseNav(instanceId: string): NavItem[] {
-  const base = `/student/courses/${instanceId}`
+function studentCourseNav(instanceSlug: string): NavItem[] {
+  const base = `/student/courses/${instanceSlug}`
   return [
     { href: base, label: 'Overview', icon: Home, match: 'exact' },
     { href: `${base}/labs`, label: 'Labs', icon: Layers, match: 'prefix' },
@@ -100,8 +101,8 @@ export function Sidebar({
   if (courseContext) {
     courseNav =
       role === 'professor'
-        ? profCourseNav(courseContext.id)
-        : studentCourseNav(courseContext.id)
+        ? profCourseNav(courseContext.slug)
+        : studentCourseNav(courseContext.slug)
   }
 
   return (

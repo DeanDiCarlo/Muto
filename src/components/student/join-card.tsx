@@ -27,7 +27,7 @@ export function JoinCard({
         setError(result.error)
         return
       }
-      router.push(`/student/courses/${result.instanceId}`)
+      router.push(`/student/courses/${result.instanceSlug}`)
     })
   }
 

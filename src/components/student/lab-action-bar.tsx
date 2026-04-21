@@ -3,13 +3,13 @@ import { Button } from '@/components/ui/button'
 import { MessageCircle, ClipboardCheck } from 'lucide-react'
 
 export function LabActionBar({
-  instanceId,
-  labId,
+  instanceSlug,
+  labSlug,
 }: {
-  instanceId: string
-  labId: string
+  instanceSlug: string
+  labSlug: string
 }) {
-  const base = `/student/courses/${instanceId}/labs/${labId}`
+  const base = `/student/courses/${instanceSlug}/labs/${labSlug}`
 
   return (
     <div className="sticky bottom-0 mt-10 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75 sm:-mx-6 sm:px-6">

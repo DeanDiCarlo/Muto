@@ -24,8 +24,8 @@ interface Question {
 interface ReviewRunnerProps {
   sessionId: string
   enrollmentId: string
-  instanceId: string
-  labId: string
+  instanceSlug: string
+  labSlug: string
   questions: Question[]
 }
 
@@ -34,8 +34,8 @@ type Phase = 'taking' | 'completing' | 'results'
 export function ReviewRunner({
   sessionId,
   enrollmentId,
-  instanceId,
-  labId,
+  instanceSlug,
+  labSlug,
   questions,
 }: ReviewRunnerProps) {
   // Resume from first unanswered question
@@ -173,7 +173,7 @@ export function ReviewRunner({
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
-      <ReviewCompletionCard instanceId={instanceId} labId={labId} />
+      <ReviewCompletionCard instanceSlug={instanceSlug} labSlug={labSlug} />
       <ReviewResultsCard
         evaluations={evaluations}
         totalQuestions={questions.length}

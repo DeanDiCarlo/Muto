@@ -4,21 +4,22 @@ import { ChevronRight } from 'lucide-react'
 
 export function LabRow({
   lab,
-  instanceId,
+  instanceSlug,
 }: {
   lab: {
     id: string
+    slug: string
     title: string
     generationStatus: string
     hasStarted: boolean
   }
-  instanceId: string
+  instanceSlug: string
 }) {
   const isReady = lab.generationStatus === 'complete'
 
   return (
     <Link
-      href={isReady ? `/student/courses/${instanceId}/labs/${lab.id}` : '#'}
+      href={isReady ? `/student/courses/${instanceSlug}/labs/${lab.slug}` : '#'}
       aria-disabled={!isReady}
       className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition-colors ${
         isReady

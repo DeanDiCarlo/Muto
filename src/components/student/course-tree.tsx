@@ -10,6 +10,7 @@ import { LabRow } from './lab-row'
 
 type LabInfo = {
   id: string
+  slug: string
   title: string
   position: number
   generationStatus: string
@@ -25,10 +26,10 @@ type ModuleInfo = {
 
 export function CourseTree({
   modules,
-  instanceId,
+  instanceSlug,
 }: {
   modules: ModuleInfo[]
-  instanceId: string
+  instanceSlug: string
 }) {
   // Default open all modules
   const defaultValue = modules.map((m) => m.id)
@@ -52,7 +53,7 @@ export function CourseTree({
               </p>
             ) : (
               mod.labs.map((lab) => (
-                <LabRow key={lab.id} lab={lab} instanceId={instanceId} />
+                <LabRow key={lab.id} lab={lab} instanceSlug={instanceSlug} />
               ))
             )}
           </AccordionContent>

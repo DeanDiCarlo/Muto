@@ -42,7 +42,7 @@ export async function joinCourse(joinCode: string) {
     // Case-insensitive lookup
     const { data: instance, error: lookupError } = await admin
       .from('course_instances')
-      .select('id, course_id, is_active, courses!inner(title)')
+      .select('id, slug, course_id, is_active, courses!inner(title)')
       .ilike('join_code', parsed.data.joinCode)
       .single()
 
@@ -70,6 +70,7 @@ export async function joinCourse(joinCode: string) {
       return {
         success: true as const,
         instanceId: instance.id,
+        instanceSlug: instance.slug,
         courseTitle: courseTitle ?? 'Course',
         alreadyEnrolled: true,
       }
@@ -94,6 +95,7 @@ export async function joinCourse(joinCode: string) {
     return {
       success: true as const,
       instanceId: instance.id,
+      instanceSlug: instance.slug,
       courseTitle: courseTitle ?? 'Course',
       alreadyEnrolled: false,
     }
@@ -256,7 +258,7 @@ export async function getStudentCourseView(instanceId: string) {
 
     const { data: labs, error: labErr } = await admin
       .from('labs')
-      .select('id, module_id, title, position, generation_status')
+      .select('id, slug, module_id, title, position, generation_status')
       .in('module_id', (modules ?? []).map((m) => m.id))
       .order('position', { ascending: true })
 
@@ -286,6 +288,7 @@ export async function getStudentCourseView(instanceId: string) {
       position: mod.position,
       labs: (labsByModule.get(mod.id) ?? []).map((lab) => ({
         id: lab.id,
+        slug: lab.slug,
         title: lab.title,
         position: lab.position,
         generationStatus: lab.generation_status,

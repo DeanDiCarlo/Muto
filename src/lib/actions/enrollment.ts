@@ -42,7 +42,7 @@ export async function joinCourse(joinCode: string) {
     // Case-insensitive lookup
     const { data: instance, error: lookupError } = await admin
       .from('course_instances')
-      .select('id, slug, course_id, is_active, courses!inner(title)')
+      .select('id, slug, display_slug, course_id, is_active, courses!inner(title)')
       .ilike('join_code', parsed.data.joinCode)
       .single()
 
@@ -70,7 +70,7 @@ export async function joinCourse(joinCode: string) {
       return {
         success: true as const,
         instanceId: instance.id,
-        instanceSlug: instance.slug,
+        instanceSlug: instance.display_slug,
         courseTitle: courseTitle ?? 'Course',
         alreadyEnrolled: true,
       }
@@ -95,7 +95,7 @@ export async function joinCourse(joinCode: string) {
     return {
       success: true as const,
       instanceId: instance.id,
-      instanceSlug: instance.slug,
+      instanceSlug: instance.display_slug,
       courseTitle: courseTitle ?? 'Course',
       alreadyEnrolled: false,
     }
@@ -121,7 +121,7 @@ export async function listMyEnrollments() {
     const { data, error } = await admin
       .from('enrollments')
       .select(
-        'id, enrolled_at, course_instance_id, course_instances!inner(id, slug, semester, is_active, course_id, courses!inner(id, title, subject_area))'
+        'id, enrolled_at, course_instance_id, course_instances!inner(id, slug, display_slug, semester, is_active, course_id, courses!inner(id, title, subject_area))'
       )
       .eq('user_id', user.id)
       .order('enrolled_at', { ascending: false })
@@ -137,6 +137,7 @@ export async function listMyEnrollments() {
       course_instances: {
         id: string
         slug: string
+        display_slug: string
         semester: string
         is_active: boolean
         course_id: string
@@ -148,7 +149,7 @@ export async function listMyEnrollments() {
     const enrollments = rows.map((r) => ({
       enrollmentId: r.id,
       instanceId: r.course_instances.id,
-      instanceSlug: r.course_instances.slug,
+      instanceSlug: r.course_instances.display_slug,
       courseId: r.course_instances.course_id,
       courseTitle: r.course_instances.courses.title,
       subjectArea: r.course_instances.courses.subject_area,
@@ -178,8 +179,8 @@ export async function getInstanceBySlug(slug: string) {
 
   const { data: instance, error } = await admin
     .from('course_instances')
-    .select('id, slug, course_id, semester, is_active')
-    .eq('slug', slug)
+    .select('id, slug, display_slug, course_id, semester, is_active')
+    .eq('display_slug', slug)
     .maybeSingle()
 
   if (error || !instance) return null

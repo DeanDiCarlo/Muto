@@ -13,6 +13,7 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
+import { slugify } from '@/lib/utils/slug'
 
 // ---------------------------------------------------------------------------
 // Zod schemas
@@ -21,6 +22,12 @@ import { getCurrentUser } from '@/lib/auth'
 const createInstanceSchema = z.object({
   courseId: z.string().uuid(),
   semester: z.string().trim().min(1, 'Semester is required').max(100),
+  displaySlug: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must use lowercase letters, numbers, and hyphens')
+    .min(2)
+    .max(80),
 })
 
 const toggleInstanceSchema = z.string().uuid()
@@ -31,6 +38,7 @@ const toggleInstanceSchema = z.string().uuid()
 
 export type InstanceCardData = {
   id: string
+  slug: string
   semester: string
   joinCode: string
   joinLink: string
@@ -86,21 +94,21 @@ function buildJoinLink(code: string): string {
  */
 async function requireCourseOwner(
   courseId: string
-): Promise<{ userId: string } | { error: string }> {
+): Promise<{ userId: string; institutionId: string } | { error: string }> {
   const user = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
 
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('courses')
-    .select('id, created_by')
+    .select('id, created_by, institution_id')
     .eq('id', courseId)
     .single()
 
   if (error || !data) return { error: 'Course not found' }
   if (data.created_by !== user.id) return { error: 'Forbidden' }
 
-  return { userId: user.id }
+  return { userId: user.id, institutionId: data.institution_id }
 }
 
 /**
@@ -128,27 +136,58 @@ export async function createInstance(
   }
 
   const admin = createAdminClient()
+  const displaySlug = parsed.data.displaySlug
+
+  // Pre-check display_slug uniqueness within the institution before entering
+  // the join-code retry loop — the slug doesn't change between attempts.
+  const { data: existing } = await admin
+    .from('course_instances')
+    .select('id')
+    .eq('institution_id', ownership.institutionId)
+    .eq('display_slug', displaySlug)
+    .maybeSingle()
+
+  if (existing) {
+    return {
+      success: false,
+      error: 'That section slug is already in use at your institution. Choose a different one.',
+    }
+  }
 
   const maxAttempts = 5
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const code = generateJoinCode()
     const link = buildJoinLink(code)
 
+    // Internal slug: semester-based with UUID suffix for stable uniqueness.
+    // display_slug is the professor-defined human-readable URL slug.
+    const internalSlug = `${slugify(parsed.data.semester) || 'instance'}-${code.toLowerCase().slice(0, 6)}`
+
     const { data, error } = await admin
       .from('course_instances')
       .insert({
         course_id: parsed.data.courseId,
+        institution_id: ownership.institutionId,
         semester: parsed.data.semester,
+        slug: internalSlug,
+        display_slug: displaySlug,
         join_code: code,
         join_link: link,
         is_active: true,
       })
-      .select('id, semester, join_code, join_link, is_active, created_at')
+      .select('id, slug, display_slug, semester, join_code, join_link, is_active, created_at')
       .single()
 
     if (error) {
-      // Postgres unique_violation = 23505. Retry with a new code.
+      // 23505 on join_code → retry with a new code.
+      // 23505 on display_slug → race condition; surface as user error.
       if (error.code === '23505') {
+        if (error.message.includes('display_slug')) {
+          return {
+            success: false,
+            error: 'That section slug is already in use at your institution. Choose a different one.',
+          }
+        }
         continue
       }
       return { success: false, error: error.message }
@@ -172,6 +211,7 @@ export async function createInstance(
       success: true,
       instance: {
         id: data.id,
+        slug: data.display_slug,
         semester: data.semester,
         joinCode: data.join_code,
         joinLink: data.join_link ?? link,
@@ -205,7 +245,7 @@ export async function listInstances(
   const { data, error } = await admin
     .from('course_instances')
     .select(
-      'id, semester, join_code, join_link, is_active, created_at, enrollments(id)'
+      'id, slug, display_slug, semester, join_code, join_link, is_active, created_at, enrollments(id)'
     )
     .eq('course_id', parsedId.data)
     .order('created_at', { ascending: false })
@@ -216,6 +256,7 @@ export async function listInstances(
     const enrollments = (row.enrollments ?? []) as Array<{ id: string }>
     return {
       id: row.id,
+      slug: row.display_slug,
       semester: row.semester,
       joinCode: row.join_code,
       joinLink: row.join_link ?? buildJoinLink(row.join_code),

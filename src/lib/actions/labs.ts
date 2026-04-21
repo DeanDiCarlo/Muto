@@ -298,10 +298,10 @@ export async function getLabBySlug(
 
   const { data: course, error: courseErr } = await admin
     .from('courses')
-    .select('id, slug, title')
+    .select('id, slug, display_slug, title')
     .eq('institution_id', user.institutionId)
     .eq('created_by', user.id)
-    .eq('slug', courseSlug)
+    .eq('display_slug', courseSlug)
     .maybeSingle()
 
   if (courseErr || !course) return null
@@ -334,7 +334,7 @@ export async function getLabBySlug(
       moduleId: lab.module_id,
       courseId: lab.course_id,
     },
-    course: { id: course.id, slug: course.slug, title: course.title },
+    course: { id: course.id, slug: (course as unknown as { display_slug: string }).display_slug, title: course.title },
   }
 }
 

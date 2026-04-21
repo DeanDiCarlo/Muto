@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth'
-import { slugify } from '@/lib/utils/slug'
+import { slugify, ensureUniqueSlug } from '@/lib/utils/slug'
 
 // ---------------------------------------------------------------------------
 // Zod schemas
@@ -24,6 +24,14 @@ const createCourseSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters').max(200),
   subjectArea: z.string().trim().max(100).optional().or(z.literal('')),
   description: z.string().trim().max(1000).optional().or(z.literal('')),
+  displaySlug: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must use lowercase letters, numbers, and hyphens')
+    .min(2)
+    .max(80)
+    .optional()
+    .or(z.literal('')),
 })
 
 const updateCourseSchema = z.object({
@@ -95,6 +103,7 @@ export async function createCourse(
     title: formData.get('title'),
     subjectArea: formData.get('subjectArea'),
     description: formData.get('description'),
+    displaySlug: formData.get('displaySlug'),
   })
 
   if (!parsed.success) {
@@ -103,6 +112,29 @@ export async function createCourse(
   }
 
   const admin = createAdminClient()
+
+  // Resolve display_slug: use professor-provided value or derive from title.
+  // ensureUniqueSlug appends -2, -3, … on collision so auto-derived slugs
+  // never fail; provided slugs fail fast with a user-facing error.
+  let displaySlug: string
+  const providedSlug = parsed.data.displaySlug || ''
+  if (providedSlug) {
+    displaySlug = providedSlug
+  } else {
+    displaySlug = await ensureUniqueSlug(
+      slugify(parsed.data.title) || 'course',
+      async (candidate) => {
+        const { data } = await admin
+          .from('courses')
+          .select('id')
+          .eq('institution_id', user.institutionId)
+          .eq('display_slug', candidate)
+          .maybeSingle()
+        return data !== null
+      }
+    )
+  }
+
   // Id-suffix matches the migration-006 backfill pattern; no collision retry
   // needed because the suffix is derived from the row's own uuid.
   const { data: inserted, error: insertErr } = await admin
@@ -112,6 +144,7 @@ export async function createCourse(
       created_by: user.id,
       title: parsed.data.title,
       slug: 'pending',
+      display_slug: displaySlug,
       subject_area: parsed.data.subjectArea || null,
       description: parsed.data.description || null,
     })
@@ -119,6 +152,9 @@ export async function createCourse(
     .single()
 
   if (insertErr || !inserted) {
+    if (insertErr?.code === '23505' && insertErr.message.includes('display_slug')) {
+      return { error: 'That course slug is already in use at your institution. Choose a different one.' }
+    }
     return { error: insertErr?.message ?? 'Failed to create course' }
   }
 
@@ -132,7 +168,7 @@ export async function createCourse(
     return { error: slugErr.message }
   }
 
-  redirect(`/professor/courses/${slug}`)
+  redirect(`/professor/courses/${displaySlug}`)
 }
 
 /**
@@ -149,7 +185,7 @@ export async function listCoursesForProfessor(): Promise<CourseCardData[]> {
     .select(
       `
       id,
-      slug,
+      display_slug,
       title,
       description,
       subject_area,
@@ -181,7 +217,7 @@ export async function listCoursesForProfessor(): Promise<CourseCardData[]> {
 
     return {
       id: c.id,
-      slug: c.slug,
+      slug: c.display_slug,
       title: c.title,
       description: c.description,
       subjectArea: c.subject_area,
@@ -213,7 +249,7 @@ export async function getCourseOverview(courseId: string): Promise<CourseOvervie
       .from('courses')
       .select(
         `
-        id, slug, title, description, subject_area, created_at,
+        id, slug, display_slug, title, description, subject_area, created_at,
         source_materials ( id ),
         generation_plans ( id, status, created_at ),
         modules ( id, labs ( id, generation_status ) ),
@@ -266,7 +302,7 @@ export async function getCourseOverview(courseId: string): Promise<CourseOvervie
   return {
     course: {
       id: c.id,
-      slug: c.slug,
+      slug: (c as unknown as { display_slug: string }).display_slug,
       title: c.title,
       description: c.description,
       subjectArea: c.subject_area,
@@ -343,7 +379,7 @@ export async function getCourse(courseId: string) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('courses')
-    .select('id, title, slug, description, subject_area, institution_id, created_by, created_at')
+    .select('id, title, slug, display_slug, description, subject_area, institution_id, created_by, created_at')
     .eq('id', parsedId.data)
     .eq('created_by', user.id)
     .single()
@@ -353,8 +389,9 @@ export async function getCourse(courseId: string) {
 }
 
 /**
- * Slug-scoped counterpart to `getCourse`. Scoped to (institution_id, created_by)
- * via the current user, matching the unique index on courses.
+ * Display-slug-scoped counterpart to `getCourse`. Looks up by display_slug
+ * (the professor-defined URL slug) rather than the internal UUID-suffixed slug.
+ * Scoped to (institution_id, created_by) via the current user.
  */
 export async function getCourseBySlug(slug: string) {
   const user = await getCurrentUser()
@@ -363,10 +400,10 @@ export async function getCourseBySlug(slug: string) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('courses')
-    .select('id, title, slug, description, subject_area, institution_id, created_by, created_at')
+    .select('id, title, slug, display_slug, description, subject_area, institution_id, created_by, created_at')
     .eq('institution_id', user.institutionId)
     .eq('created_by', user.id)
-    .eq('slug', slug)
+    .eq('display_slug', slug)
     .single()
 
   if (error || !data) return null

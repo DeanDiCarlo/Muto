@@ -163,3 +163,37 @@ S4p-T1 (migration 006 SQL) ─> S4p-T2 (apply + regenerate types) ─> S4p-T3 (p
 - **Acceptance**:
   - [ ] All three checks pass locally.
   - [ ] No regression: parse_materials still claims and processes (unchanged pipeline).
+
+#### S4p-T8 Verification Results
+
+Playwright not installed → manual checklist per plan fallback.
+
+**Automated (PASS):**
+- [x] `npx tsc --noEmit` — 0 errors
+- [x] `npm run lint` — 0 errors (7 pre-existing warnings, unchanged)
+- [x] `npx jest` — 10/10 middleware unit tests pass
+- [x] No `[courseId]`/`[labId]`/`[instanceId]` route folders under `src/app/` (grep clean)
+- [x] No `.eq('slug', ...)` on `courses` or `course_instances` tables in server actions — all use `display_slug`
+- [x] Middleware matcher configured for `/professor/courses/:path*` and `/student/courses/:path*`
+
+**Manual (run against `npm run dev` + local Supabase):**
+
+1. **Slug-based navigation**
+   - Log in via dev-auth (`/dev/login`)
+   - Go to `/professor/courses` → click any course card
+   - Expected: address bar shows `/professor/courses/{display_slug}`, no UUID
+
+2. **Mismatch redirect (307)**
+   - While on a lab page, manually edit the URL to swap the course slug for a different valid course slug (one that doesn't own the lab)
+   - Expected: Next.js 307 redirect to the correct course slug for that lab
+
+3. **UUID → slug redirect (308)**
+   - Copy a raw course UUID from the Supabase dashboard (or `SELECT id FROM courses LIMIT 1`)
+   - Navigate to `/professor/courses/{raw-uuid}`
+   - Expected: middleware issues 308, address bar resolves to `/professor/courses/{display_slug}`
+   - Repeat for `/student/courses/{raw-instance-uuid}`
+
+4. **Pipeline regression**
+   - Upload a PDF on any course's materials tab
+   - Watch Railway worker logs: `parse_materials` job should claim and process without error
+   - Expected: no change in pipeline behavior (middleware and display_slug are read-only from the worker's perspective)

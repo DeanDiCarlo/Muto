@@ -3,7 +3,7 @@
 //
 // This module is a stub. It powers the local dev/login experience until the
 // real SSO sprint replaces it. The contract (getCurrentUser, requireProfessor,
-// requireStudent, getUserRole) is what callers should depend on; the
+// requireStudent) is what callers should depend on; the
 // implementation will be swapped to read a real Supabase Auth session backed
 // by SAML/Duo at Miami University.
 //
@@ -54,15 +54,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: data.role as UserRole,
     institutionId: data.institution_id,
   }
-}
-
-/**
- * Returns the role of the current user, or null if unauthed.
- * 'ta' is treated as a professor for navigation purposes for now.
- */
-export async function getUserRole(): Promise<UserRole | null> {
-  const user = await getCurrentUser()
-  return user?.role ?? null
 }
 
 /**

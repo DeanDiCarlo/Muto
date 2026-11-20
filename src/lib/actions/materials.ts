@@ -177,7 +177,6 @@ export async function getMaterials(courseId: string) {
     }
 
     // Fetch parse jobs for these materials
-    const materialIds = materials.map((m) => m.id)
     const { data: jobs } = await supabase
       .from('generation_jobs')
       .select('id, status, progress_percent, current_step, error_message, input_payload')

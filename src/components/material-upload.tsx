@@ -18,15 +18,6 @@ const ACCEPTED_TYPES = [
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.pptx,.png,.jpg,.jpeg'
 const MAX_SIZE_BYTES = 52_428_800 // 50MB
 
-function fileTypeLabel(mime: string): string {
-  if (mime === 'application/pdf') return 'PDF'
-  if (mime.includes('wordprocessingml')) return 'DOCX'
-  if (mime.includes('presentationml')) return 'PPTX'
-  if (mime === 'image/png') return 'PNG'
-  if (mime === 'image/jpeg') return 'JPEG'
-  return 'File'
-}
-
 export function MaterialUpload({ courseId }: { courseId: string }) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
